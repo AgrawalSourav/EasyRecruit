@@ -1,3 +1,6 @@
+# This line MUST be at the top
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 annotated-types==0.7.0
 anyio==4.10.0
 asgiref==3.9.1
