@@ -1,0 +1,15 @@
+# Python Virtual Environment
+/backend/venv/
+
+# Node.js dependencies
+/frontend/node_modules/
+
+# IDE and OS files
+.vscode/
+.idea/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Environment variables file (contains secrets)
+.env

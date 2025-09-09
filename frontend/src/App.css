@@ -1,0 +1,99 @@
+/* Import font */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+
+:root {
+  --primary-color: #4A47A3;
+  --secondary-color: #7077A1;
+  --success-color: #2ECC71;
+  --warning-color: #F39C12;
+  --danger-color: #E74C3C;
+  --light-bg: #F4F7FC;
+  --card-bg: #FFFFFF;
+  --border-color: #dbe2f0;
+  --text-primary: #2C3E50;
+  --text-secondary: #8492a6;
+  --shadow: 0 4px 15px rgba(0, 0, 0, 0.07);
+  --border-radius: 12px;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--light-bg);
+  color: var(--text-primary);
+}
+
+/* --- Navbar --- */
+.custom-navbar {
+  background-color: var(--primary-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+}
+
+/* --- Card Styling --- */
+.card {
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius) !important;
+  box-shadow: var(--shadow);
+  transition: all 0.3s ease-in-out;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+  background-color: transparent !important;
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+/* --- Upload Section --- */
+.upload-section {
+  padding: 30px;
+  border: 2px dashed var(--border-color);
+  border-radius: var(--border-radius);
+  background-color: var(--card-bg);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.upload-section.drag-over {
+  border-color: var(--primary-color);
+  background: linear-gradient(135deg, #eef2ff, #f9f9ff);
+  transform: scale(1.02);
+}
+
+/* --- Result Cards --- */
+.result-card-animated {
+  border-left: 5px solid var(--primary-color);
+  background-color: var(--card-bg);
+  border-radius: var(--border-radius);
+}
+
+.score-badge {
+  font-size: 1.1em;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+/* --- Landing Page --- */
+.landing-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 2rem;
+}
+
+.landing-step {
+  padding: 15px 20px;
+  background-color: #f0f4ff;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 120px;
+  transition: transform 0.3s ease,
+}
