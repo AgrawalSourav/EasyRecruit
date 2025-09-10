@@ -16,10 +16,16 @@ from resume_parser import UniversalResumeParser
 from pdf_extractor import DocumentExtractor
 import google.generativeai as genai
 
-# Configure the Gemini client with the API key from your environment variables
+# --- Gemini API Configuration ---
+# DEPLOYMENT FIX: This is the critical change. We are explicitly setting the API endpoint.
 GEMINI_API_KEY = os.environ.get("GOOGLE_API_KEY")
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+    try:
+        client_options = {"api_endpoint": "generativelanguage.googleapis.com"}
+        genai.configure(api_key=GEMINI_API_KEY, client_options=client_options)
+        print("Gemini API configured successfully with custom endpoint.")
+    except Exception as e:
+        print(f"Error configuring Gemini API: {e}")
 
 # DEPLOYMENT: Load environment variables from a .env file. This is crucial for managing secret keys like the database URL.
 load_dotenv()
