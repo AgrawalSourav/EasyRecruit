@@ -54,7 +54,7 @@ extractor = DocumentExtractor()
 print("All components loaded successfully!")
 
 # This prompt will now be used by both functions
-RESUME_KWD_EXTRACTION_PROMPT = f"""
+RESUME_KWD_EXTRACTION_PROMPT = """
     CRITICAL: You MUST return ONLY valid JSON. NO explanations, NO additional text, NO markdown formatting.
     
     === TASK: RESEARCH-VALIDATED KEYWORD EXTRACTION ===
@@ -154,7 +154,7 @@ RESUME_KWD_EXTRACTION_PROMPT = f"""
 
     ANALYZE THIS JOB DESCRIPTION:
     ---
-    {{text_input}}
+    {text_input}
     ---
 """
 
