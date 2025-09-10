@@ -10,6 +10,7 @@ from rank_bm25 import BM25Okapi
 import logging
 import re
 import os
+import traceback
 import asyncio
 # Import our custom modules
 from resume_parser import UniversalResumeParser
@@ -293,81 +294,91 @@ def upload_resumes():
         files = request.files.getlist('files')
         processed_resumes = []
         failed_resumes = []
+        
+        logger.info(f"Received {len(files)} file(s) to process.")
+
         for file in files:
             if file.filename == '':
                 continue
+            
+            logger.info(f"--- Starting processing for {file.filename} ---")
+            
             try:
+                # STEP 1: Read and Extract Text
+                logger.info(f"[{file.filename}] Reading file content.")
                 file_content = file.read()
                 resume_text = extractor.extract_text(file_content, file.filename)
                 if resume_text.startswith('Error:'):
-                    failed_resumes.append({
-                        'filename': file.filename,
-                        'error': resume_text
-                    })
-                    continue
+                    raise ValueError(f"Extraction failed: {resume_text}")
+                logger.info(f"[{file.filename}] Text extraction successful.")
+
+                # STEP 2: Parse with UniversalResumeParser
+                logger.info(f"[{file.filename}] Parsing resume structure.")
                 parsed_resume = parser.parse_resume(resume_text, file.filename)
-                
+                logger.info(f"[{file.filename}] Parsing successful.")
+
+                # STEP 3: Augment Keywords with Gemini AI
                 if not GEMINI_API_KEY:
-                    logger.error("Gemini API key not configured, skipping keyword augmentation.")
+                    logger.warning(f"[{file.filename}] Gemini API key not found. Using basic skills.")
                     parsed_resume['combined_keywords'] = parsed_resume.get('skills', [])
                 else:
+                    logger.info(f"[{file.filename}] Calling Gemini API for keyword augmentation.")
                     searchable_text = parsed_resume.get('searchable_content', resume_text)
                     prompt = RESUME_KWD_EXTRACTION_PROMPT.format(text_input=searchable_text)
                     try:
                         model = genai.GenerativeModel('gemini-1.5-flash-latest')
                         generation_config = genai.types.GenerationConfig(response_mime_type="application/json")
                         response = model.generate_content(prompt, generation_config=generation_config)
-                        
-                        # Find the first '{' and the last '}' to extract the JSON object
+
                         json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
                         if not json_match:
                             raise ValueError("No valid JSON object found in the Gemini response.")
                         
                         json_string = json_match.group(0)
                         ai_keywords_data = json.loads(json_string)
-                        # --- FIX ENDS HERE ---
-                        # --- CHANGE: Logic to flatten the new JSON output into a simple list ---
-                        flat_keyword_list = []
                         
-                        # --- FINAL FIX: Safer way to flatten the JSON data ---
-                        # We explicitly check for the keys we expect, preventing crashes.
+                        flat_keyword_list = []
                         expected_categories = [
                             "hard_skills", "tools_and_platforms", "methodologies_and_frameworks",
                             "domain_knowledge", "qualifications", "experience_indicators"
                         ]
-
                         for category in expected_categories:
-                            # Safely get the list of keywords for the category.
-                            # If the category doesn't exist in the AI response, it defaults to an empty list [].
                             keywords = ai_keywords_data.get(category, [])
-                            
                             if isinstance(keywords, list):
                                 flat_keyword_list.extend(keywords)
-                                                
-                        # Assign the final, flattened list to be stored in the database
+                        
                         parsed_resume['combined_keywords'] = flat_keyword_list
+                        logger.info(f"[{file.filename}] Gemini call and keyword processing successful.")
 
                     except Exception as e:
-                        logger.error(f"Error calling Gemini API for resume augmentation: {str(e)}")
-                        # Fallback to basic skills if the API fails
+                        logger.error(f"[{file.filename}] Error during Gemini call. Falling back to basic skills. Details: {str(e)}")
                         parsed_resume['combined_keywords'] = parsed_resume.get('skills', [])
 
+                # STEP 4: Store in Database
+                logger.info(f"[{file.filename}] Storing parsed data in the database.")
                 resume_id = store_resume_in_db(parsed_resume)
+                logger.info(f"[{file.filename}] Successfully stored with resume_id: {resume_id}.")
+                
                 processed_resumes.append({
                     'resume_id': resume_id, 'name': parsed_resume['name'], 'file_name': file.filename,
                     'skills_count': len(parsed_resume.get('combined_keywords', [])),
                     'experience_years': parsed_resume['total_experience_years'], 'current_title': parsed_resume['current_title']
                 })
+
             except Exception as e:
-                logger.error(f"Error processing {file.filename}: {str(e)}")
+                # THIS IS THE CRITICAL CHANGE - LOG THE FULL TRACEBACK
+                logger.error(f"--- FAILED processing {file.filename}. See full traceback below ---")
+                logger.error(traceback.format_exc())
                 failed_resumes.append({'filename': file.filename, 'error': f'Processing failed: {str(e)}'})
         
         response = {'message': f'Successfully processed {len(processed_resumes)} resumes', 'processed_resumes': processed_resumes, 'total_processed': len(processed_resumes), 'total_failed': len(failed_resumes)}
         if failed_resumes: response['failed_resumes'] = failed_resumes
         return jsonify(response), 200
+
     except Exception as e:
-        logger.error(f"Error in upload_resumes: {str(e)}")
-        return jsonify({'error': f'Upload failed: {str(e)}'}), 500
+        logger.error(f"--- A CRITICAL UNHANDLED ERROR occurred in /upload_resumes ---")
+        logger.error(traceback.format_exc())
+        return jsonify({'error': 'An unexpected server error occurred.'}), 500
                 
 @app.route('/extract-keywords', methods=['POST'])
 def extract_keywords():
