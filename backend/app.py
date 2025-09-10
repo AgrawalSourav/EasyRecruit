@@ -526,6 +526,9 @@ def match_resumes():
         data = request.json
         # This variable now holds the object with "required_keywords" and "preferred_keywords"
         jd_keywords_categorized = data.get('keywords', {})
+        print("--- DEBUG: RECEIVED JD KEYWORDS ---")
+        print(json.dumps(jd_keywords_categorized, indent=2))
+        print("------------------------------------")
         top_k = min(int(data.get('top_k', 10)), 100)
 
         if not jd_keywords_categorized:
@@ -546,9 +549,16 @@ def match_resumes():
         all_resumes = Resume.query.all()
         scored_resumes = []
 
-        for resume in all_resumes:
+        print(f"--- DEBUG: SCORING {len(all_resumes)} RESUMES ---")
+
+        for i, resume in enumerate(all_resumes):
             # The resume keywords are a simple, flat list, which is correct
             resume_keywords = set(k.lower() for k in json.loads(resume.combined_keywords_json)) if resume.combined_keywords_json else set()
+            if i == 0:
+                print(f"--- DEBUG: KEYWORDS FOR FIRST RESUME ({resume.file_name}) ---")
+                print(resume_keywords)
+                print("-------------------------------------------------")
+
             current_score, report_details = 0, {"scoring_keywords": {}, "additional_keywords": {}}
             
             # Iterate through the nested JD keywords to compare against the flat resume keyword list
