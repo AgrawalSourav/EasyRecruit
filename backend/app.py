@@ -313,7 +313,7 @@ def upload_resumes():
                 else:
                     prompt = RESUME_KWD_EXTRACTION_PROMPT.format(text_input=resume_text)
                     try:
-                        model = genai.GenerativeModel('gemini-1.5-pro-latest')
+                        model = genai.GenerativeModel('gemini-1.5-flash-latest')
                         generation_config = genai.types.GenerationConfig(response_mime_type="application/json")
                         response = model.generate_content(prompt, generation_config=generation_config)
                         
@@ -500,7 +500,7 @@ def extract_keywords():
 
     try:
         # Initialize the Gemini model
-        model = genai.GenerativeModel('gemini-1.5-pro-latest')
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
         # Set the generation config to ensure the output is JSON
         generation_config = genai.types.GenerationConfig(
