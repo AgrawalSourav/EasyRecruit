@@ -243,24 +243,24 @@ def extract_keywords():
     Extract ALL essential keywords from job descriptions using academic research-validated methodologies for optimal ATS and semantic matching. This system implements findings from NLP research papers and commercial platforms for production-level resume matching.
 
     === REQUIRED JSON OUTPUT FORMAT ===
-            {
-            "required_keywords": {
+            {{
+            "required_keywords": {{
                 "hard_skills": [],
                 "tools_and_platforms": [],
                 "methodologies_and_frameworks": [],
                 "domain_knowledge": [],
                 "qualifications": [],
                 "experience_indicators": []
-            },
-            "preferred_keywords": {
+            }},
+            "preferred_keywords": {{
                 "hard_skills": [],
                 "tools_and_platforms": [],
                 "methodologies_and_frameworks": [],
                 "domain_knowledge": [],
                 "qualifications": [],
                 "experience_indicators": []
-            }
-            }
+            }}
+            }}
 
             === ESSENTIAL KEYWORD CATEGORIES (Research-Validated) ===
 
@@ -365,9 +365,7 @@ def extract_keywords():
             - PRIORITIZE SEMANTIC MEANING OVER WORD FREQUENCY
             - DO NOT HALLUCINATE OR INFER KEYWORDS NOT PRESENT IN THE TEXT
 
-            ANALYZE THIS JOB DESCRIPTION:
-
-    Job Description:
+    ANALYZE THIS JOB DESCRIPTION:
     ---
     {job_description}
     ---
