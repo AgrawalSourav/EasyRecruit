@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: job-matching-api
+    runtime: python
+    plan: free
+    region: ohio # You can change this to a region closer to you if you wish
+    rootDir: backend
+    pythonVersion: '3.11'
+    buildCommand: './build.sh'
+    startCommand: 'gunicorn app:app'
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: job-app-database # IMPORTANT: Use the exact name of your Render database here
+          property: internalDatabaseUrl
