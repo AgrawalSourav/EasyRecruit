@@ -68,7 +68,7 @@ function App() {
   useEffect(() => {
     checkApiHealth();
     fetchStats();
-  }, [checkApiHealth, fetchStats]);
+  }, []);
 
   const checkApiHealth = async () => {
     try { await axios.get(`${API_BASE_URL}/health`); } 
