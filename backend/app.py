@@ -311,7 +311,8 @@ def upload_resumes():
                     logger.error("Gemini API key not configured, skipping keyword augmentation.")
                     parsed_resume['combined_keywords'] = parsed_resume.get('skills', [])
                 else:
-                    prompt = RESUME_KWD_EXTRACTION_PROMPT.format(text_input=resume_text)
+                    searchable_text = parsed_resume.get('searchable_content', resume_text)
+                    prompt = RESUME_KWD_EXTRACTION_PROMPT.format(text_input=searchable_text)
                     try:
                         model = genai.GenerativeModel('gemini-1.5-flash-latest')
                         generation_config = genai.types.GenerationConfig(response_mime_type="application/json")
@@ -320,13 +321,22 @@ def upload_resumes():
                         # --- CHANGE: Logic to flatten the new JSON output into a simple list ---
                         ai_keywords_data = json.loads(response.text)
                         flat_keyword_list = []
-                        # Loop through all the categories returned by the AI
-                        for category in ai_keywords_data:
-                            # Check if the value is a list (to avoid errors)
-                            if isinstance(ai_keywords_data[category], list):
-                                # Add all keywords from that category to our single flat list
-                                flat_keyword_list.extend(ai_keywords_data[category])
                         
+                        # --- FINAL FIX: Safer way to flatten the JSON data ---
+                        # We explicitly check for the keys we expect, preventing crashes.
+                        expected_categories = [
+                            "hard_skills", "tools_and_platforms", "methodologies_and_frameworks",
+                            "domain_knowledge", "qualifications", "experience_indicators"
+                        ]
+
+                        for category in expected_categories:
+                            # Safely get the list of keywords for the category.
+                            # If the category doesn't exist in the AI response, it defaults to an empty list [].
+                            keywords = ai_keywords_data.get(category, [])
+                            
+                            if isinstance(keywords, list):
+                                flat_keyword_list.extend(keywords)
+                                                
                         # Assign the final, flattened list to be stored in the database
                         parsed_resume['combined_keywords'] = flat_keyword_list
 
