@@ -52,6 +52,112 @@ parser = UniversalResumeParser()
 extractor = DocumentExtractor()
 print("All components loaded successfully!")
 
+# This prompt will now be used by both functions
+RESUME_KWD_EXTRACTION_PROMPT = f"""
+    CRITICAL: You MUST return ONLY valid JSON. NO explanations, NO additional text, NO markdown formatting.
+    
+    === TASK: RESEARCH-VALIDATED KEYWORD EXTRACTION ===
+    Extract ALL essential keywords from the resume using academic research-validated methodologies for optimal ATS and semantic matching. This system implements findings from NLP research papers and commercial platforms for production-level resume matching.
+
+    === REQUIRED JSON OUTPUT FORMAT ===
+            {{
+                "hard_skills": [],
+                "tools_and_platforms": [],
+                "methodologies_and_frameworks": [],
+                "domain_knowledge": [],
+                "qualifications": [],
+                "experience_indicators": []
+            }}
+    
+            === ESSENTIAL KEYWORD CATEGORIES (Research-Validated) ===
+
+            1. **hard_skills**: Quantifiable, task-oriented technical competencies essential for role performance
+            - Programming languages, analytical methods, technical procedures
+            - Specialized techniques, laboratory methods, engineering processes
+            - Measurable competencies with clear learning pathways
+            - Examples: Python, Statistical Analysis, PCR, Finite Element Analysis, Machine Learning
+
+            2. **tools_and_platforms**: Specific software, hardware, and digital platforms
+            - Development environments, cloud services, collaboration tools
+            - Industry-specific software, machinery, laboratory equipment
+            - Examples: AWS, Git, Salesforce, Docker, Jira, Adobe Creative Suite
+
+            3. **methodologies_and_frameworks**: Named operational and project management approaches
+            - Process improvement systems, development practices, quality standards
+            - Compliance frameworks, industry methodologies
+            - Examples: Agile, Scrum, Lean Six Sigma, DevOps, ISO 27001, GDPR
+
+            4. **domain_knowledge**: Industry-specific expertise and specialized knowledge areas ONLY if explicitly mentioned
+            - Business sectors, functional areas, regulatory knowledge
+            - Theoretical concepts, business frameworks, scientific principles
+            - Examples: Healthcare, FinTech, GAAP, Quantum Mechanics, Supply Chain
+            - **CRITICAL: Only extract if explicitly stated in the job description. Do not infer or assume.**
+
+            5. **qualifications**: Formal educational credentials, certifications, and licenses
+            - Academic degrees, professional certifications, regulatory licenses
+            - Must be specific titles, not general categories
+            - Examples: Bachelor of Science, PMP, CPA, AWS Solutions Architect, Registered Nurse
+
+            6. **experience_indicators**: Quantified experience requirements and seniority markers
+            - Years of experience, proficiency levels, leadership scope
+            - Extract both numbers and context
+
+            === RESEARCH-BASED EXTRACTION METHODOLOGY ===
+            1. SEMANTIC SIGNIFICANCE: Prioritize contextual meaning over frequency - extract keywords based on professional relevance and semantic centrality within the text
+            2. HIERARCHICAL CLASSIFICATION: Use established skill taxonomies (ESCO, O*NET principles) to classify and validate keyword importance
+            3. CONTEXTUAL IMPORTANCE RANKING: Analyze proximity to requirement indicators, repetition patterns, and hierarchical positioning
+            4. DOMAIN-SPECIFIC RELEVANCE: Extract keywords that carry specialized meaning within professional contexts
+            5. COMPREHENSIVE COVERAGE: Capture both explicit mentions and implied competencies from job responsibilities
+
+            === ADVANCED EXTRACTION TECHNIQUES ===
+
+            **Semantic Role Analysis:**
+            - Extract implied skills from job responsibilities ("manage team" → Leadership, Team Management)
+            - Capture domain expertise from industry context ONLY if explicitly mentioned
+            - **When extracting from action phrases involving interactions with entities or teams, prioritize extracting the implied behavioral or soft skill instead of the named entity or organizational unit.**
+            - **Filter out named entities, department names, or organization titles unless they directly represent candidate-required domain expertise or qualifications.**
+            - **Limit extraction of implied tools and platforms to only those explicitly mentioned or clearly indicated in context. Do not infer specific software or platforms solely from generic terms unless directly named.**
+
+            **Compound Phrase Decomposition:**
+            - "Python and SQL development" → ["Python", "SQL"]  
+            - "Machine learning and AI systems" → ["Machine Learning", "AI", "Artificial Intelligence"]
+            - "Bachelor's in Computer Science or Engineering" → ["Bachelor's in Computer Science", "Bachelor's in Engineering"]
+
+            **Contextual Expansion:**
+            - Include both full terms and common abbreviations
+            - Extract synonyms mentioned in context
+            - Capture implied competencies from complex phrases
+            - **Restrict expansion to avoid adding speculative or commonly associated tools/platforms not appearing explicitly or strongly implied by the text.**
+
+            **Industry-Specific Extraction:**
+            - Prioritize domain-relevant terminology
+            - Extract compliance and regulatory terms specific to sector ONLY if explicitly mentioned
+            - Identify industry-standard tools and methodologies ONLY if explicitly mentioned
+
+            === RESEARCH-VALIDATED SUCCESS CRITERIA ===
+            - SEMANTIC PRECISION: Keywords must carry professional significance, not just statistical frequency
+            - COMPREHENSIVE COVERAGE: Extract every skill, tool, qualification, and competency mentioned or implied
+            - CONTEXTUAL ACCURACY: Proper classification based on linguistic cues and placement
+            - ATOMIC GRANULARITY: Break compound phrases into individual, searchable terms
+            - DOMAIN RELEVANCE: Prioritize industry-specific and role-relevant terminology
+            - PRODUCTION QUALITY: Suitable for commercial ATS and semantic matching systems
+
+            === CRITICAL REMINDERS ===
+            - RETURN ONLY THE JSON OBJECT
+            - NO EXPLANATIONS, COMMENTARY, OR METADATA
+            - EXTRACT BOTH EXPLICIT AND IMPLIED COMPETENCIES
+            - USE EXACT TERMINOLOGY FROM JOB DESCRIPTION WHEN POSSIBLE
+            - ENSURE ALL ARRAYS CONTAIN INDIVIDUAL ATOMIC KEYWORDS
+            - PRIORITIZE SEMANTIC MEANING OVER WORD FREQUENCY
+            - DO NOT HALLUCINATE OR INFER KEYWORDS NOT PRESENT IN THE TEXT
+
+    ANALYZE THIS JOB DESCRIPTION:
+    ---
+    {{text_input}}
+    ---
+"""
+
+
 # --- CHANGED: Added keyword weight configuration ---
 # You can easily adjust the importance of different skill categories here.
 KEYWORD_WEIGHTS = {
@@ -200,37 +306,52 @@ def upload_resumes():
                     })
                     continue
                 parsed_resume = parser.parse_resume(resume_text, file.filename)
-                # Run async augment_keywords synchronously with asyncio.run
-                parsed_augmented = asyncio.run(parser.augment_keywords(parsed_resume))
+                
+                if not GEMINI_API_KEY:
+                    logger.error("Gemini API key not configured, skipping keyword augmentation.")
+                    parsed_resume['combined_keywords'] = parsed_resume.get('skills', [])
+                else:
+                    prompt = RESUME_KWD_EXTRACTION_PROMPT.format(text_input=resume_text)
+                    try:
+                        model = genai.GenerativeModel('gemini-1.5-pro-latest')
+                        generation_config = genai.types.GenerationConfig(response_mime_type="application/json")
+                        response = model.generate_content(prompt, generation_config=generation_config)
+                        
+                        # --- CHANGE: Logic to flatten the new JSON output into a simple list ---
+                        ai_keywords_data = json.loads(response.text)
+                        flat_keyword_list = []
+                        # Loop through all the categories returned by the AI
+                        for category in ai_keywords_data:
+                            # Check if the value is a list (to avoid errors)
+                            if isinstance(ai_keywords_data[category], list):
+                                # Add all keywords from that category to our single flat list
+                                flat_keyword_list.extend(ai_keywords_data[category])
+                        
+                        # Assign the final, flattened list to be stored in the database
+                        parsed_resume['combined_keywords'] = flat_keyword_list
 
-                resume_id = store_resume_in_db(parsed_augmented)
+                    except Exception as e:
+                        logger.error(f"Error calling Gemini API for resume augmentation: {str(e)}")
+                        # Fallback to basic skills if the API fails
+                        parsed_resume['combined_keywords'] = parsed_resume.get('skills', [])
+
+                resume_id = store_resume_in_db(parsed_resume)
                 processed_resumes.append({
-                    'resume_id': resume_id,
-                    'name': parsed_resume['name'],
-                    'file_name': file.filename,
-                    'skills_count': len(parsed_augmented.get('combined_keywords', [])),
-                    'experience_years': parsed_resume['total_experience_years'],
-                    'current_title': parsed_resume['current_title']
+                    'resume_id': resume_id, 'name': parsed_resume['name'], 'file_name': file.filename,
+                    'skills_count': len(parsed_resume.get('combined_keywords', [])),
+                    'experience_years': parsed_resume['total_experience_years'], 'current_title': parsed_resume['current_title']
                 })
             except Exception as e:
                 logger.error(f"Error processing {file.filename}: {str(e)}")
-                failed_resumes.append({
-                    'filename': file.filename,
-                    'error': f'Processing failed: {str(e)}'
-                })
-        response = {
-            'message': f'Successfully processed {len(processed_resumes)} resumes',
-            'processed_resumes': processed_resumes,
-            'total_processed': len(processed_resumes),
-            'total_failed': len(failed_resumes)
-        }
-        if failed_resumes:
-            response['failed_resumes'] = failed_resumes
+                failed_resumes.append({'filename': file.filename, 'error': f'Processing failed: {str(e)}'})
+        
+        response = {'message': f'Successfully processed {len(processed_resumes)} resumes', 'processed_resumes': processed_resumes, 'total_processed': len(processed_resumes), 'total_failed': len(failed_resumes)}
+        if failed_resumes: response['failed_resumes'] = failed_resumes
         return jsonify(response), 200
     except Exception as e:
         logger.error(f"Error in upload_resumes: {str(e)}")
         return jsonify({'error': f'Upload failed: {str(e)}'}), 500
-
+                
 @app.route('/extract-keywords', methods=['POST'])
 def extract_keywords():
     # Check if the Gemini API key was found and configured
@@ -339,9 +460,9 @@ def extract_keywords():
             - **Limit extraction of implied tools and platforms to only those explicitly mentioned or clearly indicated in context. Do not infer specific software or platforms solely from generic terms unless directly named.**
 
             **Compound Phrase Decomposition:**
-            - "Python and SQL development" → ["Python", "SQL", "Software Development"]  
-            - "Machine learning and AI systems" → ["Machine Learning", "AI", "Artificial Intelligence", "AI Systems"]
-            - "Bachelor's in Computer Science or Engineering" → ["Bachelor's Degree in Computer Science", "Bachelor's degree in Engineering"]
+            - "Python and SQL development" → ["Python", "SQL"]  
+            - "Machine learning and AI systems" → ["Machine Learning", "AI", "Artificial Intelligence"]
+            - "Bachelor's in Computer Science or Engineering" → ["Bachelor's in Computer Science", "Bachelor's in Engineering"]
 
             **Contextual Expansion:**
             - Include both full terms and common abbreviations
@@ -379,7 +500,7 @@ def extract_keywords():
 
     try:
         # Initialize the Gemini model
-        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        model = genai.GenerativeModel('gemini-1.5-pro-latest')
 
         # Set the generation config to ensure the output is JSON
         generation_config = genai.types.GenerationConfig(
@@ -403,34 +524,34 @@ def extract_keywords():
 def match_resumes():
     try:
         data = request.json
+        # This variable now holds the object with "required_keywords" and "preferred_keywords"
         jd_keywords_categorized = data.get('keywords', {})
         top_k = min(int(data.get('top_k', 10)), 100)
 
         if not jd_keywords_categorized:
             return jsonify({'error': 'No keywords provided for matching'}), 400
 
-        # 1. Calculate max score using ONLY scoring categories
+        # Calculate the max possible score by iterating through the nested structure
         max_possible_score = 0
-        for importance, categories in jd_keywords_categorized.items():
-            for category, keywords in categories.items():
-                if category in SCORING_CATEGORIES: # <-- The key change is here
-                    weight = KEYWORD_WEIGHTS.get(importance, {}).get(category, 1)
+        for importance, categories in jd_keywords_categorized.items(): # e.g., importance = "required_keywords"
+            for category, keywords in categories.items(): # e.g., category = "hard_skills"
+                if category in SCORING_CATEGORIES:
+                    # Get the correct weight for 'required' or 'preferred'
+                    weight = KEYWORD_WEIGHTS.get(importance.replace('_keywords', ''), {}).get(category, 1)
                     max_possible_score += len(keywords) * weight
 
         if max_possible_score == 0:
             return jsonify({'results': [], 'message': 'No relevant keywords to score against in the provided job description.'})
 
-        # 2. DEPLOYMENT: Fetch all resumes using the SQLAlchemy ORM. This replaces the raw sqlite3 query.
         all_resumes = Resume.query.all()
-
-        # 3. Score each resume and build the detailed report
         scored_resumes = []
-        for resume in all_resumes:
-            resume_keywords = set(k.lower() for k in json.loads(resume.combined_keywords_json)) if resume.combined_keywords_json else set()
-            
-            current_score = 0
-            report_details = {"scoring_keywords": {}, "additional_keywords": {}}
 
+        for resume in all_resumes:
+            # The resume keywords are a simple, flat list, which is correct
+            resume_keywords = set(k.lower() for k in json.loads(resume.combined_keywords_json)) if resume.combined_keywords_json else set()
+            current_score, report_details = 0, {"scoring_keywords": {}, "additional_keywords": {}}
+            
+            # Iterate through the nested JD keywords to compare against the flat resume keyword list
             for importance, categories in jd_keywords_categorized.items():
                 for category, keywords in categories.items():
                     is_scoring_cat = category in SCORING_CATEGORIES
@@ -439,7 +560,7 @@ def match_resumes():
                     if category not in report_target:
                         report_target[category] = {'matched': [], 'missing': []}
 
-                    weight = KEYWORD_WEIGHTS.get(importance, {}).get(category, 1)
+                    weight = KEYWORD_WEIGHTS.get(importance.replace('_keywords', ''), {}).get(category, 1)
 
                     for kw in keywords:
                         if kw.lower() in resume_keywords:
@@ -452,20 +573,13 @@ def match_resumes():
             normalized_score = (current_score / max_possible_score) if max_possible_score > 0 else 0
             
             scored_resumes.append({
-                "resume_id": resume.resume_id,
-                "name": resume.name,
-                "score": normalized_score,
-                "current_title": resume.current_title,
+                "resume_id": resume.resume_id, "name": resume.name, "score": normalized_score, "current_title": resume.current_title,
                 "summary": (resume.summary[:250] + "...") if resume.summary and len(resume.summary) > 250 else resume.summary,
-                "file_name": resume.file_name,
-                "report_details": report_details
+                "file_name": resume.file_name, "report_details": report_details
             })
-        
-        # 4. Sort and return results
+            
         sorted_resumes = sorted(scored_resumes, key=lambda x: x['score'], reverse=True)
-        top_results = sorted_resumes[:top_k]
-
-        return jsonify({"results": top_results, "total_resumes_scored": len(all_resumes)}), 200
+        return jsonify({"results": sorted_resumes[:top_k], "total_resumes_scored": len(all_resumes)}), 200
 
     except Exception as e:
         logger.error(f"Error in matching: {e}")
