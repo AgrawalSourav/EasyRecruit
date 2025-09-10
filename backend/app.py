@@ -318,8 +318,15 @@ def upload_resumes():
                         generation_config = genai.types.GenerationConfig(response_mime_type="application/json")
                         response = model.generate_content(prompt, generation_config=generation_config)
                         
+                        # Find the first '{' and the last '}' to extract the JSON object
+                        json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
+                        if not json_match:
+                            raise ValueError("No valid JSON object found in the Gemini response.")
+                        
+                        json_string = json_match.group(0)
+                        ai_keywords_data = json.loads(json_string)
+                        # --- FIX ENDS HERE ---
                         # --- CHANGE: Logic to flatten the new JSON output into a simple list ---
-                        ai_keywords_data = json.loads(response.text)
                         flat_keyword_list = []
                         
                         # --- FINAL FIX: Safer way to flatten the JSON data ---

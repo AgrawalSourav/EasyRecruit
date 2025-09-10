@@ -648,6 +648,7 @@ class UniversalResumeParser:
                 if len(match_clean) > 3:
                     certifications.add(match_clean)
         return list(certifications)
+    
 
     def calculate_total_experience(self, experiences):
         total_months = 0
