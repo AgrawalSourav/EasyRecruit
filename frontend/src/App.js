@@ -68,7 +68,7 @@ function App() {
   useEffect(() => {
     checkApiHealth();
     fetchStats();
-  }, []);
+  }, [checkApiHealth, fetchStats]);
 
   const checkApiHealth = async () => {
     try { await axios.get(`${API_BASE_URL}/health`); } 
@@ -144,8 +144,6 @@ function App() {
     } catch { showAlert('❌ Error getting matches.', 'danger'); }
     finally { setLoading(false); }
   };
-
-  const getScoreColor = score => score>=0.7?'success':score>=0.4?'warning':'secondary';
 
   // --- NEW: Functions to handle the modal ---
   const handleShowReport = (candidate) => {
