@@ -373,7 +373,7 @@ def extract_keywords():
 
     try:
         # Initialize the Gemini model
-        model = genai.GenerativeModel('gemini-1.0-pro')
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
         # Set the generation config to ensure the output is JSON
         generation_config = genai.types.GenerationConfig(
