@@ -1,6 +1,11 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
+# --- NEW FEATURE: Import libraries for Auth, Hashing, and File System ---
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+import hashlib
+# ---
 from dotenv import load_dotenv  # Import the load_dotenv function
 from sentence_transformers import SentenceTransformer
 import json
@@ -35,7 +40,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-CORS(app)
+# --- NEW FEATURE: Add a secret key for session management ---
+app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "a-super-secret-key-for-development")
+# ---
+CORS(app, supports_credentials=True) # --- MODIFICATION: Added supports_credentials=True for login sessions ---
 
 # --- Database Configuration ---
 # DEPLOYMENT: Configure SQLAlchemy to connect to the database.
@@ -46,6 +54,15 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL", "sqlite:///res
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # DEPLOYMENT: Initialize the SQLAlchemy object, which we will use for all database operations.
 db = SQLAlchemy(app)
+
+# --- NEW FEATURE: Setup Flask-Login ---
+login_manager = LoginManager()
+login_manager.init_app(app)
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+# ---
 
 print("Loading sentence transformer model...")
 model = SentenceTransformer('all-mpnet-base-v2')
@@ -178,6 +195,19 @@ KEYWORD_WEIGHTS = {
 # Only these categories will be used for calculating the score
 SCORING_CATEGORIES = ['hard_skills', 'tools_and_platforms', 'methodologies_and_frameworks']
 
+# --- NEW FEATURE: User Database Model ---
+class User(db.Model, UserMixin):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(256))
+    resumes = db.relationship('Resume', backref='owner', lazy=True, cascade="all, delete-orphan")
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
 # --- SQLAlchemy Database Model ---
 # DEPLOYMENT: Define the 'resumes' table using a SQLAlchemy Model class.
 # This replaces the manual CREATE TABLE SQL query. It's more robust and works with different databases (SQLite, PostgreSQL, etc.).
@@ -217,9 +247,16 @@ class Resume(db.Model):
 
     # Primary matching field
     searchable_content = db.Column(db.Text)
-
+    
     # Parsing metadata
     parsing_metadata_json = db.Column(db.Text)
+
+    # --- NEW FEATURE: Add columns for user ownership, deduplication, and file storage ---
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    content_hash = db.Column(db.String(64), nullable=False)
+    file_path = db.Column(db.String(255), nullable=False)
+    __table_args__ = (db.UniqueConstraint('user_id', 'content_hash', name='_user_content_uc'),)
+    # ---
 
 # DEPLOYMENT: This creates a command that you can run to initialize the database.
 # In your terminal, you would run `flask init-db` one time to create the tables.
@@ -230,7 +267,7 @@ def init_db_command():
     db.create_all()
     print('Initialized the database.')
 
-def store_resume_in_db(parsed_resume: dict) -> int:
+def store_resume_in_db(parsed_resume: dict, user, file_hash: str, file_path: str) -> int:
     """Store parsed resume in the database using SQLAlchemy"""
     # Flattened fields for text search
     all_skills_text = ' | '.join(parsed_resume['skills'])
@@ -272,11 +309,52 @@ def store_resume_in_db(parsed_resume: dict) -> int:
         all_certifications_text=all_certifications_text,
         all_project_text=all_project_text,
         searchable_content=parsed_resume['searchable_content'],
-        parsing_metadata_json=json.dumps(parsed_resume['parsing_metadata'])
+        parsing_metadata_json=json.dumps(parsed_resume['parsing_metadata']),
+        # --- NEW FEATURE: Save user and hash info ---
+        owner=user,
+        content_hash=file_hash,
+        file_path=file_path
+        # ---
     )
     db.session.add(new_resume)
     db.session.commit()
     return new_resume.resume_id
+
+# --- NEW FEATURE: User Authentication Routes ---
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    if User.query.filter_by(email=data['email']).first():
+        return jsonify({'error': 'Email address already registered'}), 409
+    
+    user = User(email=data['email'])
+    user.set_password(data['password'])
+    db.session.add(user)
+    db.session.commit()
+    return jsonify({'message': 'User created successfully'}), 201
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    user = User.query.filter_by(email=data['email']).first()
+    if user is None or not user.check_password(data['password']):
+        return jsonify({'error': 'Invalid email or password'}), 401
+    
+    login_user(user)
+    return jsonify({'message': 'Logged in successfully', 'user': {'email': user.email}})
+
+@app.route('/logout', methods=['POST'])
+@login_required
+def logout():
+    logout_user()
+    return jsonify({'message': 'Logged out successfully'})
+
+@app.route('/@me')
+@login_required
+def get_current_user():
+    return jsonify({'user': {'email': current_user.email}})
+# ---
+
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -287,6 +365,7 @@ def health_check():
     }), 200
 
 @app.route('/upload_resumes', methods=['POST'])
+@login_required
 def upload_resumes():
     try:
         if 'files' not in request.files:
@@ -294,7 +373,10 @@ def upload_resumes():
         files = request.files.getlist('files')
         processed_resumes = []
         failed_resumes = []
+        skipped_resumes = []
         
+        user_upload_folder = os.path.join(app.config['UPLOAD_FOLDER'], f"user_{current_user.id}")
+        os.makedirs(user_upload_folder, exist_ok=True)
         logger.info(f"Received {len(files)} file(s) to process.")
 
         for file in files:
@@ -307,6 +389,21 @@ def upload_resumes():
                 # STEP 1: Read and Extract Text
                 logger.info(f"[{file.filename}] Reading file content.")
                 file_content = file.read()
+                file.seek(0) # Reset file pointer after reading
+
+                file_hash = hashlib.sha256(file_content).hexdigest()
+                
+                existing_resume = Resume.query.filter_by(owner=current_user, content_hash=file_hash).first()
+                if existing_resume:
+                    skipped_resumes.append(file.filename)
+                    logger.info(f"Skipping duplicate file {file.filename} for user {current_user.email}")
+                    continue
+
+                # Create a unique filename to prevent conflicts
+                unique_filename = f"{datetime.utcnow().timestamp()}_{file.filename}"
+                file_path = os.path.join(user_upload_folder, unique_filename)
+                file.save(file_path)
+                
                 resume_text = extractor.extract_text(file_content, file.filename)
                 if resume_text.startswith('Error:'):
                     raise ValueError(f"Extraction failed: {resume_text}")
@@ -356,7 +453,7 @@ def upload_resumes():
 
                 # STEP 4: Store in Database
                 logger.info(f"[{file.filename}] Storing parsed data in the database.")
-                resume_id = store_resume_in_db(parsed_resume)
+                resume_id = store_resume_in_db(parsed_resume, current_user, file_hash, file_path)
                 logger.info(f"[{file.filename}] Successfully stored with resume_id: {resume_id}.")
                 
                 processed_resumes.append({
@@ -549,6 +646,7 @@ def extract_keywords():
 
 
 @app.route('/match', methods=['POST'])
+@login_required
 def match_resumes():
     try:
         data = request.json
@@ -558,6 +656,7 @@ def match_resumes():
         print(json.dumps(jd_keywords_categorized, indent=2))
         print("------------------------------------")
         top_k = min(int(data.get('top_k', 10)), 100)
+        resume_ids_to_match = data.get('resume_ids')
 
         if not jd_keywords_categorized:
             return jsonify({'error': 'No keywords provided for matching'}), 400
@@ -574,12 +673,17 @@ def match_resumes():
         if max_possible_score == 0:
             return jsonify({'results': [], 'message': 'No relevant keywords to score against in the provided job description.'})
 
-        all_resumes = Resume.query.all()
+        # Build query based on whether specific resumes were selected
+        base_query = Resume.query.filter_by(owner=current_user)
+        if resume_ids_to_match and isinstance(resume_ids_to_match, list):
+            base_query = base_query.filter(Resume.resume_id.in_(resume_ids_to_match))
+        
+        resumes_to_score = base_query.all()
         scored_resumes = []
 
-        print(f"--- DEBUG: SCORING {len(all_resumes)} RESUMES ---")
+        print(f"--- DEBUG: SCORING {len(resumes_to_score)} RESUMES ---")
 
-        for i, resume in enumerate(all_resumes):
+        for i, resume in enumerate(resumes_to_score):
             # The resume keywords are a simple, flat list, which is correct
             resume_keywords = set(k.lower() for k in json.loads(resume.combined_keywords_json)) if resume.combined_keywords_json else set()
             if i == 0:
@@ -610,18 +714,51 @@ def match_resumes():
             
             normalized_score = (current_score / max_possible_score) if max_possible_score > 0 else 0
             
+            # --- NEW FEATURE: Add a direct download URL to the result ---
+            file_url = f"/download/resume/{resume.resume_id}"
+            # ---
             scored_resumes.append({
                 "resume_id": resume.resume_id, "name": resume.name, "score": normalized_score, "current_title": resume.current_title,
                 "summary": (resume.summary[:250] + "...") if resume.summary and len(resume.summary) > 250 else resume.summary,
-                "file_name": resume.file_name, "report_details": report_details
+                "file_name": resume.file_name, "report_details": report_details,
+                "file_url": file_url
             })
             
         sorted_resumes = sorted(scored_resumes, key=lambda x: x['score'], reverse=True)
-        return jsonify({"results": sorted_resumes[:top_k], "total_resumes_scored": len(all_resumes)}), 200
+        return jsonify({"results": sorted_resumes[:top_k], "total_resumes_scored": len(resumes_to_score)}), 200
 
     except Exception as e:
         logger.error(f"Error in matching: {e}")
         return jsonify({'error': f'Failed to match: {str(e)}'}), 500
+
+# --- NEW FEATURE: Route to list a user's resumes ---
+@app.route('/resumes', methods=['GET'])
+@login_required
+def get_user_resumes():
+    resumes = Resume.query.filter_by(owner=current_user).order_by(Resume.upload_date.desc()).all()
+    resumes_list = [
+        {
+            "resume_id": r.resume_id,
+            "file_name": r.file_name,
+            "candidate_name": r.name,
+            "upload_date": r.upload_date.isoformat()
+        } for r in resumes
+    ]
+    return jsonify(resumes_list)
+
+# --- NEW FEATURE: Route to download a specific resume file ---
+@app.route('/download/resume/<int:resume_id>', methods=['GET'])
+@login_required
+def download_resume(resume_id):
+    resume = Resume.query.get_or_404(resume_id)
+    if resume.owner != current_user:
+        return jsonify({'error': 'Forbidden'}), 403
+    
+    # Use send_from_directory for security
+    directory = os.path.dirname(resume.file_path)
+    filename = os.path.basename(resume.file_path)
+    return send_from_directory(directory, filename, as_attachment=True)
+# ---
 
 @app.route('/resume/<int:resume_id>', methods=['GET'])
 def get_resume_details(resume_id):
@@ -646,10 +783,11 @@ def get_resume_details(resume_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/stats', methods=['GET'])
+@login_required
 def get_stats():
     try:
         # DEPLOYMENT: Use SQLAlchemy to perform calculations.
-        total_resumes = db.session.query(db.func.count(Resume.resume_id)).scalar()
+        total_resumes = db.session.query(db.func.count(Resume.resume_id)).filter(Resume.owner == current_user).scalar()
         exp_years_text = db.session.query(Resume.total_experience_years).all()
         
         total_exp = 0

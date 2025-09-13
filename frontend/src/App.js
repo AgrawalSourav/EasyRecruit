@@ -11,6 +11,13 @@ import { FiUpload, FiFileText, FiSearch, FiAward, FiMenu } from 'react-icons/fi'
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 
+// --- NEW FEATURE: Axios configuration to send cookies with requests ---
+const apiClient = axios.create({
+    baseURL: API_BASE_URL,
+    withCredentials: true
+});
+// ---
+
 // --- Animation Variants ---
 const fadeVariants = {
   hidden: { opacity: 0 },
@@ -44,9 +51,96 @@ const ReportSection = ({ title, keywordsData }) => {
   );
 };
 
-function App() {
-  // --- Tabs ---
-  const [activeTab, setActiveTab] = useState('landing');
+// --- NEW FEATURE: Authentication Context ---
+const AuthContext = createContext(null);
+
+const AuthProvider = ({ children }) => {
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        apiClient.get('/@me').then(response => {
+            setUser(response.data.user);
+        }).catch(() => {
+            setUser(null);
+        }).finally(() => {
+            setLoading(false);
+        });
+    }, []);
+
+    const login = async (email, password) => {
+        const response = await apiClient.post('/login', { email, password });
+        setUser(response.data.user);
+    };
+
+    const logout = async () => {
+        await apiClient.post('/logout');
+        setUser(null);
+    };
+
+    const value = { user, login, logout, loading };
+
+    return <AuthContext.Provider value={value}>{!loading && children}</AuthContext.Provider>;
+};
+
+const useAuth = () => useContext(AuthContext);
+
+const ProtectedRoute = ({ children }) => {
+    const { user } = useAuth();
+    if (!user) {
+        return <Navigate to="/login" />;
+    }
+    return children;
+};
+// ---
+
+// --- NEW FEATURE: Login Page Component ---
+const LoginPage = () => {
+    const navigate = useNavigate();
+    const { login } = useAuth();
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+        try {
+            await login(email, password);
+            navigate('/');
+        } catch (err) {
+            setError('Invalid email or password.');
+        }
+    };
+
+    return (
+        <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: '80vh' }}>
+            <Card style={{ width: '400px' }}>
+                <Card.Body>
+                    <h2 className="text-center mb-4">Log In</h2>
+                    {error && <Alert variant="danger">{error}</Alert>}
+                    <Form onSubmit={handleSubmit}>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Email</Form.Label>
+                            <Form.Control type="email" value={email} onChange={e => setEmail(e.target.value)} required />
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Password</Form.Label>
+                            <Form.Control type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+                        </Form.Group>
+                        <Button type="submit" className="w-100">Log In</Button>
+                    </Form>
+                </Card.Body>
+            </Card>
+        </Container>
+    );
+};
+
+
+const MainApp = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('upload');
 
   // --- States ---
   const [selectedFiles, setSelectedFiles] = useState([]);
@@ -65,26 +159,32 @@ function App() {
   const [stats, setStats] = useState({ total_resumes_loaded: 0, model_ready: false });
   const [isDragging, setIsDragging] = useState(false);
 
+  // --- NEW FEATURE: State for resume selection ---
+  const [userResumes, setUserResumes] = useState([]);
+  const [selectedResumeIds, setSelectedResumeIds] = useState([]);
+
+  const showAlert = (message, type = 'info', duration = 6000) => {
+      setAlert({ show: true, message, type });
+      setTimeout(() => setAlert({ show: false, message: '', type: 'info' }), duration);
+  };
+
+  // --- MODIFICATION: Function to fetch user-specific resumes ---
+  const fetchUserResumes = () => {
+      apiClient.get('/resumes').then(response => {
+          setUserResumes(response.data);
+      }).catch(err => showAlert('Failed to fetch your resumes.', 'danger'));
+  };
+
   useEffect(() => {
-    checkApiHealth();
-    fetchStats();
+    fetchUserResumes();
   }, []);
 
-  const checkApiHealth = async () => {
-    try { await axios.get(`${API_BASE_URL}/health`); } 
-    catch { showAlert('⚠️ Backend API is not running. Please start the backend server.', 'danger'); }
-  };
-  const fetchStats = async () => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/stats`);
-      setStats(response.data);
-    } catch { showAlert('⚠️ Failed to refresh statistics.', 'warning'); }
-  };
-  const showAlert = (message, type='info') => {
-    setAlert({ show: true, message, type });
-    if (type !== 'danger') {
-      setTimeout(() => setAlert({ show: false, message: '', type: 'info' }), 6000);
-    }
+  const handleResumeSelection = (resumeId) => {
+    setSelectedResumeIds(prev =>
+      prev.includes(resumeId)
+        ? prev.filter(id => id !== resumeId)
+        : [...prev, resumeId]
+    );
   };
 
   // --- File Handlers ---
@@ -99,12 +199,15 @@ function App() {
     try {
       const formData = new FormData();
       selectedFiles.forEach(f=>formData.append('files',f));
-      const response = await axios.post(`${API_BASE_URL}/upload_resumes`, formData, { headers:{'Content-Type':'multipart/form-data'} });
-      showAlert(`✅ Successfully uploaded ${response.data.total_processed} resumes!`, 'success');
-      setSelectedFiles([]); document.getElementById('file-input').value='';
-      setTimeout(fetchStats, 1000);
-    } catch { showAlert('❌ Error uploading resumes.', 'danger'); }
-    finally { setUploadLoading(false); }
+      const response = await apiClient.post('/upload_resumes', formData);
+      const { processed_count, skipped_count, failed_count } = response.data;
+      showAlert(`Upload complete! Processed: ${processed_count}, Skipped (duplicates): ${skipped_count}, Failed: ${failed_count}`, 'success', 8000);
+      setSelectedFiles([]); 
+      document.getElementById('file-input').value='';
+      fetchUserResumes();
+    } catch(err) { showAlert('Error uploading resumes.', 'danger');
+    } finally { setUploadLoading(false);
+    }
   };
 
   // --- JD Keyword Extraction ---
@@ -123,26 +226,31 @@ function App() {
     // New checks: ensure keywords have been extracted first.
     if (!jdText.trim()) { showAlert('Please enter a Job Description.', 'warning'); return; }
     if (!extractedKeywords) { showAlert('Please extract keywords before finding matches.', 'warning'); return; }
-    if (stats.total_resumes_loaded === 0) { showAlert('Upload some resumes first.', 'warning'); return; }
+    if (selectedResumeIds.length === 0) { showAlert('Please select at least one resume to match.', 'warning'); return; }
     
     setLoading(true);
     try {
       // The payload now sends the 'keywords' object instead of the raw 'jd' text.
-      const payload = { keywords: extractedKeywords, top_k: topK };
-      const response = await axios.post(`${API_BASE_URL}/match`, payload);
-      
+      const payload = { keywords: extractedKeywords, top_k: topK, resume_ids: selectedResumeIds};
+      const response = await apiClient.post('/match', payload);
+
       // --- CHANGED: Implemented safer result handling ---
       const results = response.data.results || [];
       setMatchedResults(results); 
       
       if (results.length > 0) {
-        showAlert(`✅ Found ${results.length} matches!`, 'success');
+        showAlert(`Found ${results.length} matches!`, 'success');
         setActiveTab('matches'); // Automatically switch to the matches tab on success
       } else {
         showAlert('ℹ️ No matching resumes found for the given keywords.', 'info');
       }
-    } catch { showAlert('❌ Error getting matches.', 'danger'); }
+    } catch { showAlert('Error getting matches.', 'danger'); }
     finally { setLoading(false); }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
   };
 
   // --- NEW: Functions to handle the modal ---
@@ -242,6 +350,33 @@ function App() {
           </motion.div>
         )}
 
+        {/* --- NEW FEATURE: UI for Selecting Resumes --- */}
+        {activeTab === 'select' && (
+                <Card>
+                    <Card.Header><h4>Step 1: Select Resumes to Match</h4></Card.Header>
+                    <Card.Body>
+                        <p>Choose which resumes you'd like to include in the next match.</p>
+                        <ListGroup style={{maxHeight: '400px', overflowY: 'auto'}}>
+                            {userResumes.map(resume => (
+                                <ListGroup.Item key={resume.resume_id} action>
+                                    <Form.Check 
+                                        type="checkbox"
+                                        id={`resume-${resume.resume_id}`}
+                                        label={`${resume.candidate_name || resume.file_name} (Uploaded: ${new Date(resume.upload_date).toLocaleDateString()})`}
+                                        checked={selectedResumeIds.includes(resume.resume_id)}
+                                        onChange={() => handleResumeSelection(resume.resume_id)}
+                                    />
+                                </ListGroup.Item>
+                            ))}
+                        </ListGroup>
+                        <Button className="mt-3" onClick={() => setActiveTab('job')} disabled={selectedResumeIds.length === 0}>
+                            Proceed to Job Description ({selectedResumeIds.length} selected)
+                        </Button>
+                    </Card.Body>
+                </Card>
+        )}
+
+
         {/* --- Job Description Tab --- */}
         {activeTab==='job' && (
           <motion.div key="job" variants={fadeVariants} initial="hidden" animate="visible" exit="hidden">
@@ -298,41 +433,35 @@ function App() {
 
         {/* --- Top Matches Tab --- */}
         {activeTab === 'matches' && (
-          <motion.div key="matches" variants={fadeVariants} initial="hidden" animate="visible" exit="hidden">
-            {matchedResults.length > 0 ? (
-              <Card>
-                <Card.Header><h4>🏆 Top {matchedResults.length} Matches</h4></Card.Header>
-                <ListGroup variant="flush">
-                  {matchedResults.map((result, idx) => (
-                    <motion.div key={result.resume_id} variants={resultItemVariants} custom={idx} initial="hidden" animate="visible" transition={{ delay: idx * 0.1 }}>
-                      <ListGroup.Item>
-                        <Row className="align-items-center">
-                          <Col md={9}>
-                            <h5 className="mb-1">{result.name}</h5>
-                            <p className="text-muted mb-1">{result.current_title || 'No title specified'}</p>
-                            <p className="summary-text">{result.summary || 'No summary available.'}</p>
-                            
-                            {/* --- CHANGED: Added Detailed Report button --- */}
-                            <Button variant="outline-primary" size="sm" className="mt-2" onClick={() => handleShowReport(result)}>
-                              View Detailed Report
-                            </Button>
-                          </Col>
-                          <Col md={3} className="text-md-end text-center mt-3 mt-md-0">
-                            <div className="score-circle" style={{ background: `conic-gradient(#28a745 ${result.score * 360}deg, #e9ecef 0deg)` }}>
-                                <span>{Math.round(result.score * 100)}</span>
-                            </div>
-                            <small className="text-muted">Match Score</small>
-                          </Col>
-                        </Row>
-                      </ListGroup.Item>
-                    </motion.div>
-                  ))}
-                </ListGroup>
-              </Card>
-            ) : (
-              <Card className="empty-state text-center p-5"> {/* ... (no changes) ... */ } </Card>
-            )}
-          </motion.div>
+                 <Card>
+                    <Card.Header><h4>🏆 Top {matchedResults.length} Matches</h4></Card.Header>
+                    <ListGroup variant="flush">
+                        {matchedResults.map((result, idx) => (
+                            <motion.div key={result.resume_id} variants={resultItemVariants} custom={idx} initial="hidden" animate="visible" transition={{ delay: idx * 0.1 }}>
+                                <ListGroup.Item>
+                                    <Row className="align-items-center">
+                                        <Col md={9}>
+                                            <h5 className="mb-1">{result.name}</h5>
+                                            <p className="text-muted mb-1">{result.current_title || 'No title specified'}</p>
+                                            <p className="summary-text">{result.summary || 'No summary available.'}</p>
+                                            
+                                            {/* --- MODIFICATION: Add link to view the actual resume file --- */}
+                                            <a href={`${API_BASE_URL}${result.file_url}`} target="_blank" rel="noopener noreferrer" className="btn btn-outline-secondary btn-sm mt-2 me-2">
+                                                View Resume
+                                            </a>
+                                            <Button variant="outline-primary" size="sm" className="mt-2" onClick={() => handleShowReport(result)}>
+                                                View Detailed Report
+                                            </Button>
+                                        </Col>
+                                        <Col md={3} className="text-md-end text-center mt-3 mt-md-0">
+                                            {/* ... Score Circle JSX ... */}
+                                        </Col>
+                                    </Row>
+                                </ListGroup.Item>
+                            </motion.div>
+                        ))}
+                    </ListGroup>
+                  </Card>
         )}
       </AnimatePresence>
 
@@ -368,6 +497,27 @@ function App() {
       )}
     </Container>
   );
+}
+
+// --- MODIFICATION: The main App component now handles routing between login and the main app ---
+function App() {
+    return (
+        <AuthProvider>
+            <Router>
+                <Routes>
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route 
+                        path="/*" 
+                        element={
+                            <ProtectedRoute>
+                                <MainApp />
+                            </ProtectedRoute>
+                        } 
+                    />
+                </Routes>
+            </Router>
+        </AuthProvider>
+    );
 }
 
 export default App;
