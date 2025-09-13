@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, createContext, useContext } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
@@ -7,7 +8,7 @@ import {
   Container, Row, Col, Form, Button, Card, 
   Navbar, Nav, Alert, Spinner, ListGroup, Badge, Modal 
 } from 'react-bootstrap';
-import { FiUpload, FiFileText, FiSearch, FiAward, FiMenu } from 'react-icons/fi';
+import { FiUpload, FiFileText, FiSearch, FiAward, FiMenu, FiLogOut } from 'react-icons/fi';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 
@@ -73,12 +74,18 @@ const AuthProvider = ({ children }) => {
         setUser(response.data.user);
     };
 
+    // --- ADD THIS FUNCTION ---
+    const register = async (email, password) => {
+        await apiClient.post('/register', { email, password });
+    };
+    // ---
+
     const logout = async () => {
         await apiClient.post('/logout');
         setUser(null);
     };
 
-    const value = { user, login, logout, loading };
+    const value = { user, login, register, logout, loading };
 
     return <AuthContext.Provider value={value}>{!loading && children}</AuthContext.Provider>;
 };
@@ -97,19 +104,27 @@ const ProtectedRoute = ({ children }) => {
 // --- NEW FEATURE: Login Page Component ---
 const LoginPage = () => {
     const navigate = useNavigate();
-    const { login } = useAuth();
+    const { login, register} = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [isRegistering, setIsRegistering] = useState(false); // State to toggle the form
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
         try {
-            await login(email, password);
-            navigate('/');
+            if (isRegistering) {
+                await register(email, password);
+                // After successful registration, log them in automatically
+                await login(email, password);
+            } else {
+                await login(email, password);
+            }
+            navigate('/'); // Redirect to the main app on success
         } catch (err) {
-            setError('Invalid email or password.');
+            // Provide more specific error messages from the backend
+            setError(err.response?.data?.error || 'An error occurred.');
         }
     };
 
@@ -117,7 +132,7 @@ const LoginPage = () => {
         <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: '80vh' }}>
             <Card style={{ width: '400px' }}>
                 <Card.Body>
-                    <h2 className="text-center mb-4">Log In</h2>
+                    <h2 className="text-center mb-4">{isRegistering ? 'Register' : 'Log In'}</h2>
                     {error && <Alert variant="danger">{error}</Alert>}
                     <Form onSubmit={handleSubmit}>
                         <Form.Group className="mb-3">
@@ -128,14 +143,19 @@ const LoginPage = () => {
                             <Form.Label>Password</Form.Label>
                             <Form.Control type="password" value={password} onChange={e => setPassword(e.target.value)} required />
                         </Form.Group>
-                        <Button type="submit" className="w-100">Log In</Button>
+                        <Button type="submit" className="w-100">{isRegistering ? 'Register' : 'Log In'}</Button>
                     </Form>
+                    {/* This button allows users to switch between the forms */}
+                    <div className="w-100 text-center mt-3">
+                        <Button variant="link" onClick={() => setIsRegistering(!isRegistering)}>
+                            {isRegistering ? 'Already have an account? Log In' : "Don't have an account? Register"}
+                        </Button>
+                    </div>
                 </Card.Body>
             </Card>
         </Container>
     );
 };
-
 
 const MainApp = () => {
   const { user, logout } = useAuth();
@@ -156,7 +176,6 @@ const MainApp = () => {
   const [uploadLoading, setUploadLoading] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [alert, setAlert] = useState({ show: false, message: '', type: 'info' });
-  const [stats, setStats] = useState({ total_resumes_loaded: 0, model_ready: false });
   const [isDragging, setIsDragging] = useState(false);
 
   // --- NEW FEATURE: State for resume selection ---
@@ -215,7 +234,7 @@ const MainApp = () => {
     if(!jdText.trim()) { showAlert('Enter a JD first.', 'warning'); return; }
     setIsExtracting(true); setExtractedKeywords(null);
     try {
-      const response = await axios.post(`${API_BASE_URL}/extract-keywords`, { job_description: jdText });
+      const response = await apiClient.post(`${API_BASE_URL}/extract-keywords`, { job_description: jdText });
       setExtractedKeywords(response.data); showAlert('✅ Keywords extracted!', 'success');
     } catch { showAlert('❌ Error extracting keywords.', 'danger'); }
     finally { setIsExtracting(false); }
