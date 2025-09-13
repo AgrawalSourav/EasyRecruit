@@ -418,7 +418,7 @@ const MainApp = () => {
                   <Button variant="info" onClick={handleExtractKeywords} disabled={isExtracting || !jdText.trim()} size="lg" className="text-white">
                     {isExtracting ? <> <Spinner size="sm" className="me-2"/>Extracting... </> : '🔬 Extract Keywords'}
                   </Button>
-                  <Button variant="success" onClick={getMatches} disabled={loading || stats.total_resumes_loaded===0} size="lg">
+                  <Button variant="success" onClick={getMatches} disabled={loading} size="lg">
                     {loading ? <> <Spinner size="sm" className="me-2"/>Finding Matches... </> : '🔍 Find Top Matches'}
                   </Button>
                 </div>
