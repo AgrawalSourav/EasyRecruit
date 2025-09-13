@@ -766,16 +766,21 @@ def download_resume(resume_id):
 # ---
 
 @app.route('/resume/<int:resume_id>', methods=['GET'])
+@login_required
 def get_resume_details(resume_id):
     try:
         # DEPLOYMENT: Fetch a single resume by its ID using a standard SQLAlchemy method.
         # This is safer and easier than writing a manual SQL query.
         resume = Resume.query.get_or_404(resume_id)
         
+        # This check ensures a user cannot access another user's resume details by guessing the ID.
+        if resume.owner != current_user:
+            return jsonify({"error": "You do not have permission to view this resume."}), 403
+
         # DEPLOYMENT: Convert the SQLAlchemy object to a dictionary for the JSON response.
         resume_dict = {c.name: getattr(resume, c.name) for c in resume.__table__.columns}
         
-        json_fields = ['experiences_json', 'education_json', 'certifications_json', 'skills_json', 'parsing_metadata_json']
+        json_fields = ['experiences_json', 'education_json', 'certifications_json', 'skills_json', 'projects_json']
         for field in json_fields:
             if resume_dict.get(field):
                 try:
@@ -793,7 +798,7 @@ def get_stats():
     try:
         # DEPLOYMENT: Use SQLAlchemy to perform calculations.
         total_resumes = db.session.query(db.func.count(Resume.resume_id)).filter(Resume.owner == current_user).scalar()
-        exp_years_text = db.session.query(Resume.total_experience_years).all()
+        exp_years_text = db.session.query(Resume.total_experience_years).filter(Resume.owner == current_user).all()
         
         total_exp = 0
         valid_entries = 0
