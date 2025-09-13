@@ -44,6 +44,9 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "a-super-secret-key-for-development")
 # ---
 CORS(app, supports_credentials=True) # --- MODIFICATION: Added supports_credentials=True for login sessions ---
+# --- ADD THIS LINE ---
+app.config['UPLOAD_FOLDER'] = 'uploads'
+# ---
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 
