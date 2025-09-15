@@ -37,15 +37,24 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# This regex pattern will match:
-# 1. Your local development server (http://localhost:3000)
-# 2. Your main Netlify URL (https://earnest-taffy-f28027.netlify.app)
-# 3. ANY Netlify deploy preview URL (e.g., https://<long-hash>--earnest-taffy-f28027.netlify.app)
-origin_regex = r"https?://(localhost:3000|earnest-taffy-f28027\.netlify\.app|.*--earnest-taffy-f28027\.netlify\.app)"
-
 app = Flask(__name__)
+
+# --- NEW, PRODUCTION-READY CORS SETUP ---
+# Get the allowed origins from an environment variable.
+# The variable should contain comma-separated URLs (e.g., "http://localhost:3000,https://your-site.netlify.app")
+allowed_origins = os.environ.get("ALLOWED_ORIGINS", "").split(",")
+
+# If the list is empty or something goes wrong, have a sensible default for development.
+if not allowed_origins or allowed_origins == ['']:
+    allowed_origins = [r"http://localhost:3000"] # A default for local testing
+
+print(f"CORS enabled for the following origins: {allowed_origins}")
+
 # --- ADD THIS LINE ---
-CORS(app, supports_credentials=True, origins=re.compile(origin_regex))
+CORS(app,
+     origins=allowed_origins,
+     supports_credentials=True)
+
 # --- NEW FEATURE: Add a secret key for session management ---
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "a-super-secret-key-for-development")
 
@@ -883,7 +892,7 @@ def test_cors_route():
     return jsonify({"message": "CORS test successful!"})
 # ---
 
-if __name__ == '__main__':
+"""if __name__ == '__main__':
     print("Starting Job Matching API with Universal Resume Parser...")
     print("Endpoints available:")
     print("  POST /upload_resumes - Upload PDF/DOCX files")
@@ -892,3 +901,4 @@ if __name__ == '__main__':
     print("  GET /stats - Get system statistics")
     print("  GET /health - Health check")
     app.run(host='0.0.0.0', port=5000)
+"""
