@@ -43,7 +43,12 @@ app = Flask(__name__)
 # --- NEW FEATURE: Add a secret key for session management ---
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "a-super-secret-key-for-development")
 # ---
-CORS(app, supports_credentials=True) # --- MODIFICATION: Added supports_credentials=True for login sessions ---
+# --- MODIFICATION: Replace your old CORS line with this block ---
+# Get the allowed frontend URLs from an environment variable.
+# The variable should be a comma-separated list of URLs.
+frontend_urls = os.getenv("FRONTEND_URLS", "http://localhost:3000").split(',')
+
+CORS(app, supports_credentials=True, origins=frontend_urls) # --- MODIFICATION: Added supports_credentials=True for login sessions ---
 # --- ADD THIS LINE ---
 app.config['UPLOAD_FOLDER'] = 'uploads'
 # ---
