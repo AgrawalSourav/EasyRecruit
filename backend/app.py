@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, send_from_directory
-from flask_cors import CORS, cross_origin
+from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 # --- NEW FEATURE: Import libraries for Auth, Hashing, and File System ---
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
@@ -41,8 +41,11 @@ logger = logging.getLogger(__name__)
 # 1. Your local development server (http://localhost:3000)
 # 2. Your main Netlify URL (https://earnest-taffy-f28027.netlify.app)
 # 3. ANY Netlify deploy preview URL (e.g., https://<long-hash>--earnest-taffy-f28027.netlify.app)
+origin_regex = r"https?://(localhost:3000|earnest-taffy-f28027\.netlify\.app|.*--earnest-taffy-f28027\.netlify\.app)"
 
 app = Flask(__name__)
+# --- ADD THIS LINE ---
+CORS(app, supports_credentials=True, origins=re.compile(origin_regex))
 # --- NEW FEATURE: Add a secret key for session management ---
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "a-super-secret-key-for-development")
 
@@ -59,9 +62,6 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL", "sqlite:///resumes_dev.db")
 # DEPLOYMENT: Disable a SQLAlchemy feature that adds overhead, which is not needed here.
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-origin_regex = r"https?://(localhost:3000|earnest-taffy-f28027\.netlify\.app|.*--earnest-taffy-f28027\.netlify\.app)"
-
 
 # --- NEW FEATURE: Setup Flask-Login ---
 login_manager = LoginManager()
@@ -332,8 +332,7 @@ def store_resume_in_db(parsed_resume: dict, user, file_hash: str, file_path: str
     return new_resume.resume_id
 
 # --- NEW FEATURE: User Authentication Routes ---
-@app.route('/register', methods=['POST', 'OPTIONS'])
-@cross_origin(supports_credentials=True, origins=re.compile(origin_regex))
+@app.route('/register', methods=['POST'])
 def register():
     data = request.get_json()
     if User.query.filter_by(email=data['email']).first():
@@ -345,8 +344,7 @@ def register():
     db.session.commit()
     return jsonify({'message': 'User created successfully'}), 201
 
-@app.route('/login', methods=['POST', 'OPTIONS'])
-@cross_origin(supports_credentials=True, origins=re.compile(origin_regex))
+@app.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
     user = User.query.filter_by(email=data['email']).first()
@@ -356,16 +354,13 @@ def login():
     login_user(user)
     return jsonify({'message': 'Logged in successfully', 'user': {'email': user.email}})
 
-@app.route('/logout', methods=['POST', 'OPTIONS'])
-@cross_origin(supports_credentials=True, origins=re.compile(origin_regex))
+@app.route('/logout', methods=['POST'])
 @login_required
 def logout():
     logout_user()
     return jsonify({'message': 'Logged out successfully'})
 
 @app.route('/@me')
-@cross_origin(supports_credentials=True, origins=re.compile(origin_regex))
-@login_required
 def get_current_user():
     return jsonify({'user': {'email': current_user.email}})
 # ---
@@ -379,8 +374,7 @@ def health_check():
         'parser_ready': parser is not None
     }), 200
 
-@app.route('/upload_resumes', methods=['POST', 'OPTIONS'])
-@cross_origin(supports_credentials=True, origins=re.compile(origin_regex))
+@app.route('/upload_resumes', methods=['POST'])
 @login_required
 def upload_resumes():
     try:
@@ -493,8 +487,7 @@ def upload_resumes():
         logger.error(traceback.format_exc())
         return jsonify({'error': 'An unexpected server error occurred.'}), 500
                 
-@app.route('/extract-keywords', methods=['POST', 'OPTIONS'])
-@cross_origin(supports_credentials=True, origins=re.compile(origin_regex))
+@app.route('/extract-keywords', methods=['POST'])
 @login_required
 def extract_keywords():
     # Check if the Gemini API key was found and configured
@@ -663,8 +656,7 @@ def extract_keywords():
         return jsonify({"error": "Failed to extract keywords from the Gemini API"}), 500
 
 
-@app.route('/match', methods=['POST', 'OPTIONS'])
-@cross_origin(supports_credentials=True, origins=re.compile(origin_regex))
+@app.route('/match', methods=['POST'])
 @login_required
 def match_resumes():
     try:
@@ -752,7 +744,6 @@ def match_resumes():
 
 # --- NEW FEATURE: Route to list a user's resumes ---
 @app.route('/resumes', methods=['GET'])
-@cross_origin(supports_credentials=True, origins=re.compile(origin_regex))
 @login_required
 def get_user_resumes():
     resumes = Resume.query.filter_by(owner=current_user).order_by(Resume.upload_date.desc()).all()
@@ -885,8 +876,7 @@ def clear_database():
 """
 
 # --- ADD THIS ENTIRE BLOCK FOR DIAGNOSTIC PURPOSES ---
-@app.route('/test-cors', methods=['GET', 'OPTIONS'])
-@cross_origin(supports_credentials=True, origins=re.compile(origin_regex))
+@app.route('/test-cors', methods=['GET'])
 def test_cors_route():
     """A simple route to definitively test if CORS preflight is working."""
     logger.info("CORS test route was successfully accessed.")
