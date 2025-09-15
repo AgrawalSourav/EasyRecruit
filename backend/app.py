@@ -39,16 +39,17 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# This regex pattern will match:
+# 1. Your local development server (http://localhost:3000)
+# 2. Your main Netlify URL (https://earnest-taffy-f28027.netlify.app)
+# 3. ANY Netlify deploy preview URL (e.g., https://<long-hash>--earnest-taffy-f28027.netlify.app)
+origin_regex = r"https?://(localhost:3000|earnest-taffy-f28027\.netlify\.app|.*--earnest-taffy-f28027\.netlify\.app)"
+
 app = Flask(__name__)
 # --- NEW FEATURE: Add a secret key for session management ---
 app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "a-super-secret-key-for-development")
-# ---
-# --- MODIFICATION: Replace your old CORS line with this block ---
-# Get the allowed frontend URLs from an environment variable.
-# The variable should be a comma-separated list of URLs.
-frontend_urls = os.getenv("FRONTEND_URLS", "http://localhost:3000").split(',')
 
-CORS(app, supports_credentials=True, origins=frontend_urls) # --- MODIFICATION: Added supports_credentials=True for login sessions ---
+CORS(app, supports_credentials=True, origins=re.compile(origin_regex)) # --- MODIFICATION: Added supports_credentials=True for login sessions ---
 # --- ADD THIS LINE ---
 app.config['UPLOAD_FOLDER'] = 'uploads'
 # ---
