@@ -332,7 +332,7 @@ def store_resume_in_db(parsed_resume: dict, user, file_hash: str, file_path: str
     return new_resume.resume_id
 
 # --- NEW FEATURE: User Authentication Routes ---
-@app.route('/register', methods=['POST'])
+@app.route('/register', methods=['POST', 'OPTIONS'])
 def register():
     data = request.get_json()
     if User.query.filter_by(email=data['email']).first():
@@ -344,7 +344,7 @@ def register():
     db.session.commit()
     return jsonify({'message': 'User created successfully'}), 201
 
-@app.route('/login', methods=['POST'])
+@app.route('/login', methods=['POST', 'OPTIONS'])
 def login():
     data = request.get_json()
     user = User.query.filter_by(email=data['email']).first()
@@ -354,7 +354,7 @@ def login():
     login_user(user)
     return jsonify({'message': 'Logged in successfully', 'user': {'email': user.email}})
 
-@app.route('/logout', methods=['POST'])
+@app.route('/logout', methods=['POST', 'OPTIONS'])
 @login_required
 def logout():
     logout_user()
@@ -375,7 +375,7 @@ def health_check():
         'parser_ready': parser is not None
     }), 200
 
-@app.route('/upload_resumes', methods=['POST'])
+@app.route('/upload_resumes', methods=['POST', 'OPTIONS'])
 @login_required
 def upload_resumes():
     try:
@@ -488,7 +488,7 @@ def upload_resumes():
         logger.error(traceback.format_exc())
         return jsonify({'error': 'An unexpected server error occurred.'}), 500
                 
-@app.route('/extract-keywords', methods=['POST'])
+@app.route('/extract-keywords', methods=['POST', 'OPTIONS'])
 def extract_keywords():
     # Check if the Gemini API key was found and configured
     if not GEMINI_API_KEY:
@@ -656,7 +656,7 @@ def extract_keywords():
         return jsonify({"error": "Failed to extract keywords from the Gemini API"}), 500
 
 
-@app.route('/match', methods=['POST'])
+@app.route('/match', methods=['POST', 'OPTIONS'])
 @login_required
 def match_resumes():
     try:
