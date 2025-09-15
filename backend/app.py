@@ -882,6 +882,16 @@ def clear_database():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 """
+
+# --- ADD THIS ENTIRE BLOCK FOR DIAGNOSTIC PURPOSES ---
+@app.route('/test-cors', methods=['GET', 'OPTIONS'])
+@cross_origin(supports_credentials=True, origins=re.compile(origin_regex))
+def test_cors_route():
+    """A simple route to definitively test if CORS preflight is working."""
+    logger.info("CORS test route was successfully accessed.")
+    return jsonify({"message": "CORS test successful!"})
+# ---
+
 if __name__ == '__main__':
     print("Starting Job Matching API with Universal Resume Parser...")
     print("Endpoints available:")
