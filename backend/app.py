@@ -62,12 +62,13 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 origin_regex = r"https?://(localhost:3000|earnest-taffy-f28027\.netlify\.app|.*--earnest-taffy-f28027\.netlify\.app)"
 
-# DEPLOYMENT: Initialize the SQLAlchemy object, which we will use for all database operations.
-db = SQLAlchemy(app)
 
 # --- NEW FEATURE: Setup Flask-Login ---
 login_manager = LoginManager()
 login_manager.init_app(app)
+# DEPLOYMENT: Initialize the SQLAlchemy object, which we will use for all database operations.
+db = SQLAlchemy(app)
+
 
 @login_manager.user_loader
 def load_user(user_id):
