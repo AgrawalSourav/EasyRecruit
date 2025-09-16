@@ -369,33 +369,6 @@ const MainApp = () => {
           </motion.div>
         )}
 
-        {/* --- NEW FEATURE: UI for Selecting Resumes --- */}
-        {activeTab === 'select' && (
-                <Card>
-                    <Card.Header><h4>Step 1: Select Resumes to Match</h4></Card.Header>
-                    <Card.Body>
-                        <p>Choose which resumes you'd like to include in the next match.</p>
-                        <ListGroup style={{maxHeight: '400px', overflowY: 'auto'}}>
-                            {userResumes.map(resume => (
-                                <ListGroup.Item key={resume.resume_id} action>
-                                    <Form.Check 
-                                        type="checkbox"
-                                        id={`resume-${resume.resume_id}`}
-                                        label={`${resume.candidate_name || resume.file_name} (Uploaded: ${new Date(resume.upload_date).toLocaleDateString()})`}
-                                        checked={selectedResumeIds.includes(resume.resume_id)}
-                                        onChange={() => handleResumeSelection(resume.resume_id)}
-                                    />
-                                </ListGroup.Item>
-                            ))}
-                        </ListGroup>
-                        <Button className="mt-3" onClick={() => setActiveTab('job')} disabled={selectedResumeIds.length === 0}>
-                            Proceed to Job Description ({selectedResumeIds.length} selected)
-                        </Button>
-                    </Card.Body>
-                </Card>
-        )}
-
-
         {/* --- Job Description Tab --- */}
         {activeTab==='job' && (
           <motion.div key="job" variants={fadeVariants} initial="hidden" animate="visible" exit="hidden">
@@ -406,20 +379,9 @@ const MainApp = () => {
                   <Form.Label>Paste Job Description</Form.Label>
                   <Form.Control as="textarea" rows={8} value={jdText} onChange={e=>setJdText(e.target.value)} placeholder="Paste job description here..."/>
                 </Form.Group>
-                <Row className="mb-3">
-                  <Col md={4}>
-                    <Form.Group>
-                      <Form.Label>Number of Top Matches</Form.Label>
-                      <Form.Control type="number" value={topK} min={1} max={50} onChange={e=>setTopK(parseInt(e.target.value)||1)} />
-                    </Form.Group>
-                  </Col>
-                </Row>
                 <div className="d-grid gap-2">
                   <Button variant="info" onClick={handleExtractKeywords} disabled={isExtracting || !jdText.trim()} size="lg" className="text-white">
                     {isExtracting ? <> <Spinner size="sm" className="me-2"/>Extracting... </> : '🔬 Extract Keywords'}
-                  </Button>
-                  <Button variant="success" onClick={getMatches} disabled={loading} size="lg">
-                    {loading ? <> <Spinner size="sm" className="me-2"/>Finding Matches... </> : '🔍 Find Top Matches'}
                   </Button>
                 </div>
               </Card.Body>
@@ -452,35 +414,96 @@ const MainApp = () => {
 
         {/* --- Top Matches Tab --- */}
         {activeTab === 'matches' && (
-                 <Card>
-                    <Card.Header><h4>🏆 Top {matchedResults.length} Matches</h4></Card.Header>
-                    <ListGroup variant="flush">
-                        {matchedResults.map((result, idx) => (
-                            <motion.div key={result.resume_id} variants={resultItemVariants} custom={idx} initial="hidden" animate="visible" transition={{ delay: idx * 0.1 }}>
-                                <ListGroup.Item>
-                                    <Row className="align-items-center">
-                                        <Col md={9}>
-                                            <h5 className="mb-1">{result.name}</h5>
-                                            <p className="text-muted mb-1">{result.current_title || 'No title specified'}</p>
-                                            <p className="summary-text">{result.summary || 'No summary available.'}</p>
-                                            
-                                            {/* --- MODIFICATION: Add link to view the actual resume file --- */}
-                                            <a href={`${API_BASE_URL}${result.file_url}`} target="_blank" rel="noopener noreferrer" className="btn btn-outline-secondary btn-sm mt-2 me-2">
-                                                View Resume
-                                            </a>
-                                            <Button variant="outline-primary" size="sm" className="mt-2" onClick={() => handleShowReport(result)}>
-                                                View Detailed Report
-                                            </Button>
-                                        </Col>
-                                        <Col md={3} className="text-md-end text-center mt-3 mt-md-0">
-                                            {/* ... Score Circle JSX ... */}
-                                        </Col>
-                                    </Row>
+          <motion.div key="matches" variants={fadeVariants} initial="hidden" animate="visible" exit="hidden">
+                {/* Step 1: Select Resumes */}
+                <Card className="mb-4">
+                    <Card.Header><h4>Step 1: Select Resumes to Match</h4></Card.Header>
+                    <Card.Body>
+                        <p>Choose which of your uploaded resumes you'd like to include in the match.</p>
+                        <ListGroup style={{maxHeight: '300px', overflowY: 'auto'}}>
+                            {userResumes.map(resume => (
+                                <ListGroup.Item key={resume.resume_id} action>
+                                    <Form.Check 
+                                        type="checkbox"
+                                        id={`resume-${resume.resume_id}`}
+                                        label={
+                                            <>
+                                                <strong>{resume.candidate_name || 'N/A'}</strong>
+                                                <span className="text-muted ms-2">({resume.file_name})</span>
+                                            </>
+                                        }
+                                        checked={selectedResumeIds.includes(resume.resume_id)}
+                                        onChange={() => handleResumeSelection(resume.resume_id)}
+                                    />
                                 </ListGroup.Item>
-                            </motion.div>
-                        ))}
-                    </ListGroup>
-                  </Card>
+                            ))}
+                            {userResumes.length === 0 && <ListGroup.Item>You haven't uploaded any resumes yet. Go to the Resume tab to upload.</ListGroup.Item>}
+                        </ListGroup>
+                    </Card.Body>
+                </Card>
+
+                {/* Step 2: Run the Match */}
+                <Card className="mb-4">
+                    <Card.Header><h4>Step 2: Find Top Matches</h4></Card.Header>
+                    <Card.Body>
+                         <Row className="align-items-end">
+                            <Col md={4}>
+                                <Form.Group>
+                                    <Form.Label>Number of Top Matches</Form.Label>
+                                    <Form.Control type="number" value={topK} min={1} max={50} onChange={e=>setTopK(parseInt(e.target.value)||1)} />
+                                </Form.Group>
+                            </Col>
+                            <Col md={8}>
+                                <div className="d-grid">
+                                    <Button variant="success" onClick={getMatches} disabled={loading} size="lg">
+                                        {loading ? <> <Spinner size="sm" className="me-2"/>Finding Matches... </> : `🔍 Find Top ${topK} Matches`}
+                                    </Button>
+                                </div>
+                            </Col>
+                        </Row>
+                    </Card.Body>
+                </Card>
+                
+                {/* Step 3: View Results */}
+                {/* NEW CHANGE: This card now only appears if there are results to show. */}
+                {matchedResults.length > 0 && (
+                     <Card>
+                        <Card.Header><h4>🏆 Top {matchedResults.length} Matches</h4></Card.Header>
+                        <ListGroup variant="flush">
+                            {matchedResults.map((result, idx) => (
+                                <motion.div key={result.resume_id} variants={resultItemVariants} custom={idx} initial="hidden" animate="visible" transition={{ delay: idx * 0.1 }}>
+                                    <ListGroup.Item>
+                                        <Row className="align-items-center">
+                                            <Col md={9}>
+                                                <h5 className="mb-1">{result.name}</h5>
+                                                <p className="text-muted mb-1">{result.current_title || 'No title specified'}</p>
+                                                <p className="summary-text">{result.summary || 'No summary available.'}</p>
+                                                
+                                                <a href={`${API_BASE_URL}${result.file_url}`} target="_blank" rel="noopener noreferrer" className="btn btn-outline-secondary btn-sm mt-2 me-2">
+                                                    View Resume
+                                                </a>
+                                                <Button variant="outline-primary" size="sm" className="mt-2" onClick={() => handleShowReport(result)}>
+                                                    View Detailed Report
+                                                </Button>
+                                            </Col>
+                                            <Col md={3} className="text-md-end text-center mt-3 mt-md-0">
+                                                {/* You can add your score circle component back here if you have one */}
+                                                <div className="score-circle" style={{'--score': result.score}}>
+                                                  <span>{Math.round(result.score * 100)}%</span>
+                                                  <svg width="100" height="100" viewBox="0 0 36 36">
+                                                    <path className="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                                    <path className="circle" strokeDasharray={`${Math.round(result.score * 100)}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                                  </svg>
+                                                </div>
+                                            </Col>
+                                        </Row>
+                                    </ListGroup.Item>
+                                </motion.div>
+                            ))}
+                        </ListGroup>
+                    </Card>
+                )}
+            </motion.div>
         )}
       </AnimatePresence>
 
