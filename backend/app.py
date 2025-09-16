@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 # --- NEW FEATURE: Import libraries for Auth, Hashing, and File System ---
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask_talisman import Talisman
@@ -80,7 +81,7 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 # DEPLOYMENT: Initialize the SQLAlchemy object, which we will use for all database operations.
 db = SQLAlchemy(app)
-
+migrate = Migrate(app, db)
 
 @login_manager.user_loader
 def load_user(user_id):
