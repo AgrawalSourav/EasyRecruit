@@ -373,10 +373,13 @@ def logout():
     return jsonify({'message': 'Logged out successfully'})
 
 @app.route('/@me')
+@login_required
 def get_current_user():
+    # --- ADD THIS LOGGING ---
+    print("--- /@me endpoint HIT ---", flush=True)
+    print(f"--- Attempting to access user: {current_user.email} ---", flush=True)
+    # ---
     return jsonify({'user': {'email': current_user.email}})
-# ---
-
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -893,6 +896,19 @@ def test_cors_route():
     """A simple route to definitively test if CORS preflight is working."""
     logger.info("CORS test route was successfully accessed.")
     return jsonify({"message": "CORS test successful!"})
+
+# This will catch any unhandled exception in your application
+# and log it with a full traceback. This is CRUCIAL for debugging.
+@app.errorhandler(Exception)
+def handle_exception(e):
+    # Log the full traceback
+    import traceback
+    traceback.print_exc()
+    # Return a JSON response
+    return jsonify({
+        "error": "An internal server error occurred.",
+        "message": str(e)
+    }), 500
 # ---
 
 """if __name__ == '__main__':
