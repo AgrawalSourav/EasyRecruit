@@ -11,6 +11,20 @@ pip uninstall -y google-generativeai || echo "google-generativeai not found, con
 echo "--- Installing dependencies from requirements.txt ---"
 pip install --no-cache-dir -r requirements.txt
 
+# --- ADD THIS SECTION TO PRE-DOWNLOAD THE SENTENCE TRANSFORMER MODEL ---
+echo "--- Pre-downloading Sentence Transformer model ---"
+# Create a temporary Python script to run the download
+cat << EOF > download_model.py
+from sentence_transformers import SentenceTransformer
+print("Downloading and caching model 'all-mpnet-base-v2'...")
+SentenceTransformer('all-mpnet-base-v2')
+print("Model download complete.")
+EOF
+# Run the script
+python download_model.py
+echo "--- Model caching complete ---"
+# --- END OF NEW SECTION ---
+
 echo "--- Verifying installed packages ---"
 pip list
 
