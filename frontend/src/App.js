@@ -272,6 +272,36 @@ const MainApp = () => {
     navigate('/login');
   };
 
+  // In App.js, inside the MainApp component
+
+  const handleDownloadResume = async (fileUrl, fileName) => {
+    try {
+      // Use our apiClient (axios) to make the request, which will include the auth cookie.
+      // We must specify 'blob' as the responseType to handle the file data correctly.
+      const response = await apiClient.get(fileUrl, {
+        responseType: 'blob',
+      });
+
+      // Create a URL from the blob data
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      
+      // Create a temporary link element to trigger the download
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName); // Use the original filename
+      document.body.appendChild(link);
+      link.click();
+
+      // Clean up by removing the link and revoking the object URL
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+      console.error('Error downloading resume:', error);
+      showAlert('Failed to download resume. You may need to log in again.', 'danger');
+    }
+  };
+
   // --- NEW: Functions to handle the modal ---
   const handleShowReport = (candidate) => {
     setSelectedCandidate(candidate);
@@ -479,9 +509,9 @@ const MainApp = () => {
                                                 <p className="text-muted mb-1">{result.current_title || 'No title specified'}</p>
                                                 <p className="summary-text">{result.summary || 'No summary available.'}</p>
                                                 
-                                                <a href={`${API_BASE_URL}${result.file_url}`} target="_blank" rel="noopener noreferrer" className="btn btn-outline-secondary btn-sm mt-2 me-2">
-                                                    View Resume
-                                                </a>
+                                                <Button variant="outline-secondary" size="sm" className="mt-2 me-2" onClick={() => handleDownloadResume(result.file_url, result.file_name)}>
+                                                  View Resume
+                                                </Button>
                                                 <Button variant="outline-primary" size="sm" className="mt-2" onClick={() => handleShowReport(result)}>
                                                     View Detailed Report
                                                 </Button>
