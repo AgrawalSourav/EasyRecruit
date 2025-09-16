@@ -1,7 +1,7 @@
 # AI-Powered Resume Screening Platform
 An intelligent, cloud-native web application for securely uploading, screening, and matching candidate resumes to job descriptions using Google's Gemini Generative AI.
 
-Live Application Link (Replace with your final Netlify URL)
+[EasyRecruit](https://68c8e00bb79d8e000884a0c7--earnest-taffy-f28027.netlify.app)
 
 ## Core Features
 1. **Secure User Authentication**: Full registration and login system. Each user has their own private and secure resume database.
