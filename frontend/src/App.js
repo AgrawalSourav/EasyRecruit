@@ -6,44 +6,63 @@ import './App.css';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Container, Row, Col, Form, Button, Card, 
-  Navbar, Nav, Alert, Spinner, ListGroup, Badge, Modal 
+  Alert, Spinner, ListGroup, Badge, Modal, ProgressBar 
 } from 'react-bootstrap';
-import { FiUpload, FiFileText, FiSearch, FiAward, FiMenu, FiLogOut } from 'react-icons/fi';
+import { 
+  FiUpload, FiFileText, FiSearch, FiAward, FiLogOut, 
+  FiUser, FiTarget, FiTrendingUp, FiDownload, FiEye,
+  FiCheckCircle, FiClock, FiZap
+} from 'react-icons/fi';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 
-// --- NEW FEATURE: Axios configuration to send cookies with requests ---
+// Axios configuration to send cookies with requests
 const apiClient = axios.create({
     baseURL: API_BASE_URL,
     withCredentials: true
 });
-// ---
 
-// --- Animation Variants ---
+// Animation Variants
 const fadeVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
+};
+
+const slideInVariants = {
+  hidden: { opacity: 0, x: -30 },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.5 } }
+};
+
+const staggerContainer = {
   hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { duration: 0.5 } }
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
 };
 
-const resultItemVariants = {
-  hidden: { opacity: 0, x: -50 },
-  visible: { opacity: 1, x: 0 },
-};
-
-// --- NEW: A helper component for rendering the report details ---
+// Helper component for rendering the report details
 const ReportSection = ({ title, keywordsData }) => {
   if (!keywordsData || Object.keys(keywordsData).length === 0) return null;
 
   return (
     <>
-      <h5 className="mt-3">{title}</h5>
+      <h5 className="mt-4 mb-3 text-primary">{title}</h5>
       {Object.entries(keywordsData).map(([category, details]) => (
         (details.matched.length > 0 || details.missing.length > 0) && (
-          <div key={category} className="mb-3">
-            <strong>{category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</strong>
-            <div className="mt-1">
-              {details.matched.map(kw => <Badge key={kw} bg="success" className="me-1 mb-1 fw-normal">{kw}</Badge>)}
-              {details.missing.map(kw => <Badge key={kw} bg="secondary" className="me-1 mb-1 fw-normal">{kw}</Badge>)}
+          <div key={category} className="mb-3 p-3 bg-light rounded">
+            <h6 className="fw-bold text-dark mb-2">
+              {category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+            </h6>
+            <div className="d-flex flex-wrap gap-1">
+              {details.matched.map(kw => 
+                <Badge key={kw} bg="success" className="fw-normal px-2 py-1">{kw}</Badge>
+              )}
+              {details.missing.map(kw => 
+                <Badge key={kw} bg="secondary" className="fw-normal px-2 py-1">{kw}</Badge>
+              )}
             </div>
           </div>
         )
@@ -52,7 +71,7 @@ const ReportSection = ({ title, keywordsData }) => {
   );
 };
 
-// --- NEW FEATURE: Authentication Context ---
+// Authentication Context
 const AuthContext = createContext(null);
 
 const AuthProvider = ({ children }) => {
@@ -74,11 +93,9 @@ const AuthProvider = ({ children }) => {
         setUser(response.data.user);
     };
 
-    // --- ADD THIS FUNCTION ---
     const register = async (email, password) => {
         await apiClient.post('/register', { email, password });
     };
-    // ---
 
     const logout = async () => {
         await apiClient.post('/logout');
@@ -99,16 +116,15 @@ const ProtectedRoute = ({ children }) => {
     }
     return children;
 };
-// ---
 
-// --- NEW FEATURE: Login Page Component ---
+// Login Page Component
 const LoginPage = () => {
     const navigate = useNavigate();
     const { login, register} = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
-    const [isRegistering, setIsRegistering] = useState(false); // State to toggle the form
+    const [isRegistering, setIsRegistering] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -116,69 +132,111 @@ const LoginPage = () => {
         try {
             if (isRegistering) {
                 await register(email, password);
-                // After successful registration, log them in automatically
                 await login(email, password);
             } else {
                 await login(email, password);
             }
-            navigate('/'); // Redirect to the main app on success
+            navigate('/');
         } catch (err) {
-            // Provide more specific error messages from the backend
             setError(err.response?.data?.error || 'An error occurred.');
         }
     };
 
     return (
-        <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: '80vh' }}>
-            <Card style={{ width: '400px' }}>
-                <Card.Body>
-                    <h2 className="text-center mb-4">{isRegistering ? 'Register' : 'Log In'}</h2>
-                    {error && <Alert variant="danger">{error}</Alert>}
-                    <Form onSubmit={handleSubmit}>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Email</Form.Label>
-                            <Form.Control type="email" value={email} onChange={e => setEmail(e.target.value)} required />
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Password</Form.Label>
-                            <Form.Control type="password" value={password} onChange={e => setPassword(e.target.value)} required />
-                        </Form.Group>
-                        <Button type="submit" className="w-100">{isRegistering ? 'Register' : 'Log In'}</Button>
-                    </Form>
-                    {/* This button allows users to switch between the forms */}
-                    <div className="w-100 text-center mt-3">
-                        <Button variant="link" onClick={() => setIsRegistering(!isRegistering)}>
-                            {isRegistering ? 'Already have an account? Log In' : "Don't have an account? Register"}
-                        </Button>
-                    </div>
-                </Card.Body>
-            </Card>
-        </Container>
+        <div className="min-vh-100 d-flex align-items-center justify-content-center" 
+             style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+            <Container>
+                <Row className="justify-content-center">
+                    <Col md={6} lg={4}>
+                        <motion.div
+                            initial={{ opacity: 0, y: 50 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.8 }}
+                        >
+                            <Card className="shadow-lg border-0 rounded-4">
+                                <Card.Body className="p-5">
+                                    <div className="text-center mb-4">
+                                        <div className="mb-3">
+                                            <FiTarget size={48} className="text-primary" />
+                                        </div>
+                                        <h2 className="fw-bold text-dark mb-2">Resume Matcher</h2>
+                                        <p className="text-muted">
+                                            {isRegistering ? 'Create your account' : 'Welcome back'}
+                                        </p>
+                                    </div>
+                                    
+                                    {error && <Alert variant="danger" className="rounded-3">{error}</Alert>}
+                                    
+                                    <Form onSubmit={handleSubmit}>
+                                        <Form.Group className="mb-3">
+                                            <Form.Label className="fw-semibold">Email</Form.Label>
+                                            <Form.Control 
+                                                type="email" 
+                                                value={email} 
+                                                onChange={e => setEmail(e.target.value)} 
+                                                required 
+                                                className="rounded-3 py-2"
+                                                placeholder="Enter your email"
+                                            />
+                                        </Form.Group>
+                                        <Form.Group className="mb-4">
+                                            <Form.Label className="fw-semibold">Password</Form.Label>
+                                            <Form.Control 
+                                                type="password" 
+                                                value={password} 
+                                                onChange={e => setPassword(e.target.value)} 
+                                                required 
+                                                className="rounded-3 py-2"
+                                                placeholder="Enter your password"
+                                            />
+                                        </Form.Group>
+                                        <Button 
+                                            type="submit" 
+                                            className="w-100 py-2 fw-semibold rounded-3" 
+                                            size="lg"
+                                            style={{ background: 'linear-gradient(45deg, #667eea, #764ba2)' }}
+                                        >
+                                            {isRegistering ? 'Create Account' : 'Sign In'}
+                                        </Button>
+                                    </Form>
+                                    
+                                    <div className="text-center mt-4">
+                                        <Button 
+                                            variant="link" 
+                                            onClick={() => setIsRegistering(!isRegistering)}
+                                            className="text-decoration-none"
+                                        >
+                                            {isRegistering ? 'Already have an account? Sign In' : "Don't have an account? Register"}
+                                        </Button>
+                                    </div>
+                                </Card.Body>
+                            </Card>
+                        </motion.div>
+                    </Col>
+                </Row>
+            </Container>
+        </div>
     );
 };
 
+// Main Application Component
 const MainApp = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('upload');
 
-  // --- States ---
+  // States
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [jdText, setJdText] = useState('');
   const [topK, setTopK] = useState(10);
   const [matchedResults, setMatchedResults] = useState([]);
-  // --- NEW: State for the detailed report modal ---
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
-
   const [extractedKeywords, setExtractedKeywords] = useState(null);
   const [loading, setLoading] = useState(false);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [alert, setAlert] = useState({ show: false, message: '', type: 'info' });
   const [isDragging, setIsDragging] = useState(false);
-
-  // --- NEW FEATURE: State for resume selection ---
   const [userResumes, setUserResumes] = useState([]);
   const [selectedResumeIds, setSelectedResumeIds] = useState([]);
 
@@ -187,7 +245,6 @@ const MainApp = () => {
       setTimeout(() => setAlert({ show: false, message: '', type: 'info' }), duration);
   };
 
-  // --- MODIFICATION: Function to fetch user-specific resumes ---
   const fetchUserResumes = () => {
       apiClient.get('/resumes').then(response => {
           setUserResumes(response.data);
@@ -206,7 +263,7 @@ const MainApp = () => {
     );
   };
 
-  // --- File Handlers ---
+  // File Handlers
   const handleFileChange = files => setSelectedFiles(Array.from(files));
   const handleDragOver = e => { e.preventDefault(); setIsDragging(true); };
   const handleDragLeave = e => { e.preventDefault(); setIsDragging(false); };
@@ -229,7 +286,6 @@ const MainApp = () => {
     }
   };
 
-  // --- JD Keyword Extraction ---
   const handleExtractKeywords = async () => {
     if(!jdText.trim()) { showAlert('Enter a JD first.', 'warning'); return; }
     setIsExtracting(true); setExtractedKeywords(null);
@@ -240,26 +296,20 @@ const MainApp = () => {
     finally { setIsExtracting(false); }
   };
 
-  // --- Top Matches ---
   const getMatches = async () => {
-    // New checks: ensure keywords have been extracted first.
     if (!jdText.trim()) { showAlert('Please enter a Job Description.', 'warning'); return; }
     if (!extractedKeywords) { showAlert('Please extract keywords before finding matches.', 'warning'); return; }
     if (selectedResumeIds.length === 0) { showAlert('Please select at least one resume to match.', 'warning'); return; }
     
     setLoading(true);
     try {
-      // The payload now sends the 'keywords' object instead of the raw 'jd' text.
       const payload = { keywords: extractedKeywords, top_k: topK, resume_ids: selectedResumeIds};
       const response = await apiClient.post('/match', payload);
-
-      // --- CHANGED: Implemented safer result handling ---
       const results = response.data.results || [];
       setMatchedResults(results); 
       
       if (results.length > 0) {
         showAlert(`Found ${results.length} matches!`, 'success');
-        setActiveTab('matches'); // Automatically switch to the matches tab on success
       } else {
         showAlert('ℹ️ No matching resumes found for the given keywords.', 'info');
       }
@@ -272,37 +322,25 @@ const MainApp = () => {
     navigate('/login');
   };
 
-  // In App.js, inside the MainApp component
-
   const handleDownloadResume = async (fileUrl, fileName) => {
     try {
-      // Use our apiClient (axios) to make the request, which will include the auth cookie.
-      // We must specify 'blob' as the responseType to handle the file data correctly.
       const response = await apiClient.get(fileUrl, {
         responseType: 'blob',
       });
-
-      // Create a URL from the blob data
       const url = window.URL.createObjectURL(new Blob([response.data]));
-      
-      // Create a temporary link element to trigger the download
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', fileName); // Use the original filename
+      link.setAttribute('download', fileName);
       document.body.appendChild(link);
       link.click();
-
-      // Clean up by removing the link and revoking the object URL
       link.parentNode.removeChild(link);
       window.URL.revokeObjectURL(url);
-
     } catch (error) {
       console.error('Error downloading resume:', error);
       showAlert('Failed to download resume. You may need to log in again.', 'danger');
     }
   };
 
-  // --- NEW: Functions to handle the modal ---
   const handleShowReport = (candidate) => {
     setSelectedCandidate(candidate);
     setShowReportModal(true);
@@ -310,268 +348,508 @@ const MainApp = () => {
   const handleCloseReport = () => setShowReportModal(false);
 
   return (
-    <Container fluid className="py-3">
-
-      {/* --- Responsive Navbar --- */}
-      <Navbar expand="lg" className="custom-navbar mb-4" variant="dark">
-        <Navbar.Brand className="fw-bold">🎯 Resume Matcher</Navbar.Brand>
-        <Navbar.Toggle aria-controls="nav-links"><FiMenu /></Navbar.Toggle>
-        <Navbar.Collapse id="nav-links">
-          <Nav className="ms-auto">
-            <Nav.Link active={activeTab==='landing'} onClick={()=>setActiveTab('landing')}>Home</Nav.Link>
-            <Nav.Link active={activeTab==='resume'} onClick={()=>setActiveTab('resume')}>Resume</Nav.Link>
-            <Nav.Link active={activeTab==='job'} onClick={()=>setActiveTab('job')}>Job Description</Nav.Link>
-            <Nav.Link active={activeTab==='matches'} onClick={()=>setActiveTab('matches')}>Matches</Nav.Link>
-          </Nav>
-        </Navbar.Collapse>
-      </Navbar>
-
-      {/* --- Alerts --- */}
-      <AnimatePresence>
-        {alert.show && (
-          <motion.div initial={{opacity:0,y:-20}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-20}}>
-            <Alert variant={alert.type} dismissible onClose={()=>setAlert({...alert, show:false})} className="shadow-sm">
-              {alert.message}
-            </Alert>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* --- Sections --- */}
-      <AnimatePresence mode="wait">
-        {/* --- Landing Page --- */}
-        {activeTab==='landing' && (
-          <motion.div key="landing" variants={fadeVariants} initial="hidden" animate="visible" exit="hidden">
-            <div className="landing-page text-center">
-              <h2 className="fw-bold">Welcome to Universal Resume Matcher</h2>
-              <p className="text-muted">Upload resumes, extract JD keywords, and find top matches instantly.</p>
-              <Row className="mt-4 justify-content-center">
-                <Col className="landing-step"><FiUpload size={48} /><h6>Upload Resumes</h6></Col>
-                <Col className="landing-arrow"><FiSearch size={32} /></Col>
-                <Col className="landing-step"><FiFileText size={48} /><h6>Paste JD</h6></Col>
-                <Col className="landing-arrow"><FiSearch size={32} /></Col>
-                <Col className="landing-step"><FiAward size={48} /><h6>Top Matches</h6></Col>
-              </Row>
-            </div>
-          </motion.div>
-        )}
-
-        {/* --- Resume Upload Tab --- */}
-        {activeTab==='resume' && (
-          <motion.div key="resume" variants={fadeVariants} initial="hidden" animate="visible" exit="hidden">
-            <Card>
-              <Card.Header><h4>📤 Upload Resumes</h4></Card.Header>
-              <Card.Body>
-                <div
-                  className={`upload-section text-center ${isDragging ? 'drag-over' : ''}`}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  onClick={() => document.getElementById('file-input').click()}
+    <div className="min-vh-100" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
+      {/* Header */}
+      <div className="bg-white shadow-sm">
+        <Container>
+          <Row className="align-items-center py-3">
+            <Col>
+              <div className="d-flex align-items-center">
+                <FiTarget size={32} className="text-primary me-3" />
+                <div>
+                  <h4 className="mb-0 fw-bold text-dark">Resume Matcher</h4>
+                  <small className="text-muted">Find the perfect candidates instantly</small>
+                </div>
+              </div>
+            </Col>
+            <Col xs="auto">
+              <div className="d-flex align-items-center">
+                <span className="me-3 text-muted">Welcome, {user?.email}</span>
+                <Button 
+                  variant="outline-danger" 
+                  size="sm" 
+                  onClick={handleLogout}
+                  className="d-flex align-items-center"
                 >
-                  <input id="file-input" type="file" multiple accept=".pdf,.docx,.txt" onChange={(e)=>handleFileChange(e.target.files)} style={{display:'none'}}/>
-                  <h5>Drag & Drop Files Here</h5>
-                  <p className="text-muted">or click to select files (PDF, DOCX, TXT)</p>
-                </div>
+                  <FiLogOut className="me-1" />
+                  Logout
+                </Button>
+              </div>
+            </Col>
+          </Row>
+        </Container>
+      </div>
 
-                {selectedFiles.length>0 && (
-                  <div className="mt-3">
-                    <h6>Selected Files ({selectedFiles.length}):</h6>
-                    <ListGroup style={{maxHeight:'150px', overflowY:'auto'}}>
-                      {selectedFiles.slice(0,5).map((file,i)=>(
-                        <ListGroup.Item key={i} className="d-flex justify-content-between align-items-center">
-                          <span>{file.name}</span>
-                          <Badge bg="info">{(file.size/1024).toFixed(1)} KB</Badge>
-                        </ListGroup.Item>
-                      ))}
-                      {selectedFiles.length>5 && <ListGroup.Item className="text-muted">+ {selectedFiles.length-5} more files</ListGroup.Item>}
-                    </ListGroup>
+      <Container className="py-4">
+        {/* Alerts */}
+        <AnimatePresence>
+          {alert.show && (
+            <motion.div initial={{opacity:0,y:-20}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-20}}>
+              <Alert variant={alert.type} dismissible onClose={()=>setAlert({...alert, show:false})} className="shadow-sm mb-4 rounded-3">
+                {alert.message}
+              </Alert>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Progress Steps */}
+        <Card className="mb-4 border-0 shadow-sm">
+          <Card.Body className="py-4">
+            <Row className="text-center">
+              <Col md={4}>
+                <div className="d-flex flex-column align-items-center">
+                  <div className={`rounded-circle d-flex align-items-center justify-content-center mb-2 ${selectedFiles.length > 0 || userResumes.length > 0 ? 'bg-success text-white' : 'bg-light text-muted'}`} 
+                       style={{ width: '60px', height: '60px' }}>
+                    <FiUpload size={24} />
                   </div>
-                )}
-
-                <div className="d-grid mt-3">
-                  <Button variant="primary" onClick={uploadResumes} disabled={uploadLoading || selectedFiles.length===0} size="lg">
-                    {uploadLoading ? <> <Spinner size="sm" className="me-2"/>Uploading... </> : <>📤 Upload {selectedFiles.length} File(s)</>}
-                  </Button>
+                  <h6 className="fw-semibold">Upload Resumes</h6>
+                  <small className="text-muted">Add candidate resumes</small>
                 </div>
-              </Card.Body>
-            </Card>
-          </motion.div>
-        )}
-
-        {/* --- Job Description Tab --- */}
-        {activeTab==='job' && (
-          <motion.div key="job" variants={fadeVariants} initial="hidden" animate="visible" exit="hidden">
-            <Card>
-              <Card.Header><h4>🎯 Job Description</h4></Card.Header>
-              <Card.Body>
-                <Form.Group className="mb-3">
-                  <Form.Label>Paste Job Description</Form.Label>
-                  <Form.Control as="textarea" rows={8} value={jdText} onChange={e=>setJdText(e.target.value)} placeholder="Paste job description here..."/>
-                </Form.Group>
-                <div className="d-grid gap-2">
-                  <Button variant="info" onClick={handleExtractKeywords} disabled={isExtracting || !jdText.trim()} size="lg" className="text-white">
-                    {isExtracting ? <> <Spinner size="sm" className="me-2"/>Extracting... </> : '🔬 Extract Keywords'}
-                  </Button>
+              </Col>
+              <Col md={4}>
+                <div className="d-flex flex-column align-items-center">
+                  <div className={`rounded-circle d-flex align-items-center justify-content-center mb-2 ${extractedKeywords ? 'bg-success text-white' : 'bg-light text-muted'}`} 
+                       style={{ width: '60px', height: '60px' }}>
+                    <FiFileText size={24} />
+                  </div>
+                  <h6 className="fw-semibold">Extract Keywords</h6>
+                  <small className="text-muted">Analyze job description</small>
                 </div>
-              </Card.Body>
-            </Card>
+              </Col>
+              <Col md={4}>
+                <div className="d-flex flex-column align-items-center">
+                  <div className={`rounded-circle d-flex align-items-center justify-content-center mb-2 ${matchedResults.length > 0 ? 'bg-success text-white' : 'bg-light text-muted'}`} 
+                       style={{ width: '60px', height: '60px' }}>
+                    <FiTrendingUp size={24} />
+                  </div>
+                  <h6 className="fw-semibold">Find Matches</h6>
+                  <small className="text-muted">Get top candidates</small>
+                </div>
+              </Col>
+            </Row>
+          </Card.Body>
+        </Card>
 
-            {/* Extracted Keywords Card */}
-            {extractedKeywords && (
-              <Card className="mt-3">
-                <Card.Header><h5>🔑 Extracted Job Keywords</h5></Card.Header>
+        <Row>
+          {/* Left Column - Resume Upload & Job Description */}
+          <Col lg={6}>
+            {/* Resume Upload Section */}
+            <motion.div variants={fadeVariants} initial="hidden" animate="visible">
+              <Card className="mb-4 border-0 shadow-sm">
+                <Card.Header className="bg-white border-bottom-0 py-3">
+                  <div className="d-flex align-items-center">
+                    <FiUpload className="text-primary me-2" size={20} />
+                    <h5 className="mb-0 fw-semibold">Upload Resumes</h5>
+                  </div>
+                </Card.Header>
                 <Card.Body>
-                  <Row>
-                    <Col md={6}>
-                      <h6>Required</h6>
-                      {extractedKeywords.required_keywords && Object.entries(extractedKeywords.required_keywords).map(([cat,list])=>list.length>0&&(
-                        <div key={cat} className="mb-2"><strong>{cat.replace(/_/g,' ')}:</strong> <p className="text-muted">{list.join(', ')}</p></div>
-                      ))}
-                    </Col>
-                    <Col md={6}>
-                      <h6>Preferred</h6>
-                      {extractedKeywords.preferred_keywords && Object.entries(extractedKeywords.preferred_keywords).map(([cat,list])=>list.length>0&&(
-                        <div key={cat} className="mb-2"><strong>{cat.replace(/_/g,' ')}:</strong> <p className="text-muted">{list.join(', ')}</p></div>
-                      ))}
-                    </Col>
-                  </Row>
+                  <div
+                    className={`border-2 border-dashed rounded-3 p-4 text-center transition-all ${isDragging ? 'border-primary bg-primary bg-opacity-10' : 'border-light-grey'}`}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onClick={() => document.getElementById('file-input').click()}
+                    style={{ cursor: 'pointer', minHeight: '140px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}
+                  >
+                    <input 
+                      id="file-input" 
+                      type="file" 
+                      multiple 
+                      accept=".pdf,.docx,.txt" 
+                      onChange={(e)=>handleFileChange(e.target.files)} 
+                      style={{display:'none'}}
+                    />
+                    <FiUpload size={32} className="text-primary mb-2" />
+                    <h6 className="fw-semibold text-dark">Drop files here or click to browse</h6>
+                    <p className="text-muted mb-0">Support for PDF, DOCX, TXT files</p>
+                  </div>
+
+                  {selectedFiles.length > 0 && (
+                    <div className="mt-3">
+                      <h6 className="fw-semibold mb-2">Selected Files ({selectedFiles.length})</h6>
+                      <div className="bg-light rounded-3 p-3" style={{maxHeight:'120px', overflowY:'auto'}}>
+                        {selectedFiles.slice(0,3).map((file,i)=>(
+                          <div key={i} className="d-flex justify-content-between align-items-center py-1">
+                            <span className="small">{file.name}</span>
+                            <Badge bg="info" className="small">{(file.size/1024).toFixed(1)} KB</Badge>
+                          </div>
+                        ))}
+                        {selectedFiles.length > 3 && (
+                          <div className="text-muted small">+ {selectedFiles.length-3} more files</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="d-grid mt-3">
+                    <Button 
+                      variant="primary" 
+                      onClick={uploadResumes} 
+                      disabled={uploadLoading || selectedFiles.length===0} 
+                      size="lg"
+                      className="fw-semibold"
+                    >
+                      {uploadLoading ? (
+                        <><Spinner size="sm" className="me-2"/>Uploading...</>
+                      ) : (
+                        <>Upload {selectedFiles.length} File(s)</>
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* Display uploaded resumes count */}
+                  {userResumes.length > 0 && (
+                    <div className="mt-3 p-3 bg-success bg-opacity-10 rounded-3">
+                      <div className="d-flex align-items-center">
+                        <FiCheckCircle className="text-success me-2" />
+                        <span className="text-success fw-semibold">
+                          {userResumes.length} resume(s) available in your library
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </Card.Body>
               </Card>
-            )}
-          </motion.div>
-        )}
-
-        {/* --- Top Matches Tab --- */}
-        {activeTab === 'matches' && (
-          <motion.div key="matches" variants={fadeVariants} initial="hidden" animate="visible" exit="hidden">
-                {/* Step 1: Select Resumes */}
-                <Card className="mb-4">
-                    <Card.Header><h4>Step 1: Select Resumes to Match</h4></Card.Header>
-                    <Card.Body>
-                        <p>Choose which of your uploaded resumes you'd like to include in the match.</p>
-                        <ListGroup style={{maxHeight: '300px', overflowY: 'auto'}}>
-                            {userResumes.map(resume => (
-                                <ListGroup.Item key={resume.resume_id} action>
-                                    <Form.Check 
-                                        type="checkbox"
-                                        id={`resume-${resume.resume_id}`}
-                                        label={
-                                            <>
-                                                <strong>{resume.candidate_name || 'N/A'}</strong>
-                                                <span className="text-muted ms-2">({resume.file_name})</span>
-                                            </>
-                                        }
-                                        checked={selectedResumeIds.includes(resume.resume_id)}
-                                        onChange={() => handleResumeSelection(resume.resume_id)}
-                                    />
-                                </ListGroup.Item>
-                            ))}
-                            {userResumes.length === 0 && <ListGroup.Item>You haven't uploaded any resumes yet. Go to the Resume tab to upload.</ListGroup.Item>}
-                        </ListGroup>
-                    </Card.Body>
-                </Card>
-
-                {/* Step 2: Run the Match */}
-                <Card className="mb-4">
-                    <Card.Header><h4>Step 2: Find Top Matches</h4></Card.Header>
-                    <Card.Body>
-                         <Row className="align-items-end">
-                            <Col md={4}>
-                                <Form.Group>
-                                    <Form.Label>Number of Top Matches</Form.Label>
-                                    <Form.Control type="number" value={topK} min={1} max={50} onChange={e=>setTopK(parseInt(e.target.value)||1)} />
-                                </Form.Group>
-                            </Col>
-                            <Col md={8}>
-                                <div className="d-grid">
-                                    <Button variant="success" onClick={getMatches} disabled={loading} size="lg">
-                                        {loading ? <> <Spinner size="sm" className="me-2"/>Finding Matches... </> : `🔍 Find Top ${topK} Matches`}
-                                    </Button>
-                                </div>
-                            </Col>
-                        </Row>
-                    </Card.Body>
-                </Card>
-                
-                {/* Step 3: View Results */}
-                {/* NEW CHANGE: This card now only appears if there are results to show. */}
-                {matchedResults.length > 0 && (
-                     <Card>
-                        <Card.Header><h4>🏆 Top {matchedResults.length} Matches</h4></Card.Header>
-                        <ListGroup variant="flush">
-                            {matchedResults.map((result, idx) => (
-                                <motion.div key={result.resume_id} variants={resultItemVariants} custom={idx} initial="hidden" animate="visible" transition={{ delay: idx * 0.1 }}>
-                                    <ListGroup.Item>
-                                        <Row className="align-items-center">
-                                            <Col md={9}>
-                                                <h5 className="mb-1">{result.name}</h5>
-                                                <p className="text-muted mb-1">{result.current_title || 'No title specified'}</p>
-                                                <p className="summary-text">{result.summary || 'No summary available.'}</p>
-                                                
-                                                <Button variant="outline-secondary" size="sm" className="mt-2 me-2" onClick={() => handleDownloadResume(result.file_url, result.file_name)}>
-                                                  View Resume
-                                                </Button>
-                                                <Button variant="outline-primary" size="sm" className="mt-2" onClick={() => handleShowReport(result)}>
-                                                    View Detailed Report
-                                                </Button>
-                                            </Col>
-                                            <Col md={3} className="text-md-end text-center mt-3 mt-md-0">
-                                                {/* You can add your score circle component back here if you have one */}
-                                                <div className="score-circle" style={{'--score': result.score}}>
-                                                  <span>{Math.round(result.score * 100)}%</span>
-                                                  <svg width="100" height="100" viewBox="0 0 36 36">
-                                                    <path className="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                                    <path className="circle" strokeDasharray={`${Math.round(result.score * 100)}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                                  </svg>
-                                                </div>
-                                            </Col>
-                                        </Row>
-                                    </ListGroup.Item>
-                                </motion.div>
-                            ))}
-                        </ListGroup>
-                    </Card>
-                )}
             </motion.div>
-        )}
-      </AnimatePresence>
 
-      {/* --- NEW: The Detailed Report Modal Component --- */}
+            {/* Job Description Section */}
+            <motion.div variants={fadeVariants} initial="hidden" animate="visible">
+              <Card className="mb-4 border-0 shadow-sm">
+                <Card.Header className="bg-white border-bottom-0 py-3">
+                  <div className="d-flex align-items-center">
+                    <FiFileText className="text-primary me-2" size={20} />
+                    <h5 className="mb-0 fw-semibold">Job Description</h5>
+                  </div>
+                </Card.Header>
+                <Card.Body>
+                  <Form.Group className="mb-3">
+                    <Form.Control 
+                      as="textarea" 
+                      rows={6} 
+                      value={jdText} 
+                      onChange={e=>setJdText(e.target.value)} 
+                      placeholder="Paste the job description here..."
+                      className="rounded-3"
+                    />
+                  </Form.Group>
+                  <div className="d-grid">
+                    <Button 
+                      variant="info" 
+                      onClick={handleExtractKeywords} 
+                      disabled={isExtracting || !jdText.trim()} 
+                      size="lg"
+                      className="fw-semibold text-white"
+                    >
+                      {isExtracting ? (
+                        <><Spinner size="sm" className="me-2"/>Extracting Keywords...</>
+                      ) : (
+                        <><FiZap className="me-2"/>Extract Keywords</>
+                      )}
+                    </Button>
+                  </div>
+                </Card.Body>
+              </Card>
+            </motion.div>
+
+            {/* Extracted Keywords Display */}
+            {extractedKeywords && (
+              <motion.div variants={fadeVariants} initial="hidden" animate="visible">
+                <Card className="mb-4 border-0 shadow-sm">
+                  <Card.Header className="bg-success bg-opacity-10 border-bottom-0 py-3">
+                    <div className="d-flex align-items-center">
+                      <FiCheckCircle className="text-success me-2" size={20} />
+                      <h5 className="mb-0 fw-semibold text-success">Keywords Extracted</h5>
+                    </div>
+                  </Card.Header>
+                  <Card.Body>
+                    <Row>
+                      <Col md={6}>
+                        <h6 className="fw-semibold text-primary mb-2">Required Keywords</h6>
+                        {extractedKeywords.required_keywords && Object.entries(extractedKeywords.required_keywords).map(([cat,list])=>list.length>0&&(
+                          <div key={cat} className="mb-2">
+                            <small className="fw-semibold text-dark d-block">{cat.replace(/_/g,' ').toUpperCase()}</small>
+                            <div className="d-flex flex-wrap gap-1">
+                              {list.map(keyword => (
+                                <Badge key={keyword} bg="primary" className="small fw-normal">{keyword}</Badge>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </Col>
+                      <Col md={6}>
+                        <h6 className="fw-semibold text-secondary mb-2">Preferred Keywords</h6>
+                        {extractedKeywords.preferred_keywords && Object.entries(extractedKeywords.preferred_keywords).map(([cat,list])=>list.length>0&&(
+                          <div key={cat} className="mb-2">
+                            <small className="fw-semibold text-dark d-block">{cat.replace(/_/g,' ').toUpperCase()}</small>
+                            <div className="d-flex flex-wrap gap-1">
+                              {list.map(keyword => (
+                                <Badge key={keyword} bg="secondary" className="small fw-normal">{keyword}</Badge>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </Col>
+                    </Row>
+                  </Card.Body>
+                </Card>
+              </motion.div>
+            )}
+          </Col>
+
+          {/* Right Column - Resume Selection & Matches */}
+          <Col lg={6}>
+            {/* Resume Selection */}
+            <motion.div variants={fadeVariants} initial="hidden" animate="visible">
+              <Card className="mb-4 border-0 shadow-sm">
+                <Card.Header className="bg-white border-bottom-0 py-3">
+                  <div className="d-flex align-items-center">
+                    <FiUser className="text-primary me-2" size={20} />
+                    <h5 className="mb-0 fw-semibold">Select Resumes to Match</h5>
+                  </div>
+                </Card.Header>
+                <Card.Body>
+                  {userResumes.length > 0 ? (
+                    <div style={{maxHeight: '250px', overflowY: 'auto'}}>
+                      {userResumes.map(resume => (
+                        <div key={resume.resume_id} className="border rounded-3 p-3 mb-2 bg-light bg-opacity-50">
+                          <Form.Check 
+                            type="checkbox"
+                            id={`resume-${resume.resume_id}`}
+                            label={
+                              <div>
+                                <div className="fw-semibold text-dark">{resume.candidate_name || 'Unknown Candidate'}</div>
+                                <small className="text-muted">{resume.file_name}</small>
+                              </div>
+                            }
+                            checked={selectedResumeIds.includes(resume.resume_id)}
+                            onChange={() => handleResumeSelection(resume.resume_id)}
+                            className="custom-checkbox"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-muted">
+                      <FiClock size={32} className="mb-2" />
+                      <p>No resumes uploaded yet. Please upload some resumes first.</p>
+                    </div>
+                  )}
+
+                  {/* Match Controls */}
+                  <div className="mt-3">
+                    <Row className="align-items-end">
+                      <Col md={6}>
+                        <Form.Group>
+                          <Form.Label className="fw-semibold small">Number of Top Matches</Form.Label>
+                          <Form.Control 
+                            type="number" 
+                            value={topK} 
+                            min={1} 
+                            max={50} 
+                            onChange={e=>setTopK(parseInt(e.target.value)||1)}
+                            className="rounded-3"
+                          />
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <div className="d-grid">
+                          <Button 
+                            variant="success" 
+                            onClick={getMatches} 
+                            disabled={loading || !extractedKeywords || selectedResumeIds.length === 0} 
+                            size="lg"
+                            className="fw-semibold"
+                          >
+                            {loading ? (
+                              <><Spinner size="sm" className="me-2"/>Finding...</>
+                            ) : (
+                              <><FiSearch className="me-2"/>Find Top {topK}</>
+                            )}
+                          </Button>
+                        </div>
+                      </Col>
+                    </Row>
+                  </div>
+                </Card.Body>
+              </Card>
+            </motion.div>
+
+            {/* Match Results */}
+            {matchedResults.length > 0 && (
+              <motion.div 
+                variants={staggerContainer}
+                initial="hidden" 
+                animate="visible"
+              >
+                <Card className="border-0 shadow-sm">
+                  <Card.Header className="bg-success bg-opacity-10 border-bottom-0 py-3">
+                    <div className="d-flex align-items-center">
+                      <FiAward className="text-success me-2" size={20} />
+                      <h5 className="mb-0 fw-semibold text-success">Top {matchedResults.length} Matches</h5>
+                    </div>
+                  </Card.Header>
+                  <Card.Body className="p-0">
+                    <div style={{maxHeight: '500px', overflowY: 'auto'}}>
+                      {matchedResults.map((result, idx) => (
+                        <motion.div 
+                          key={result.resume_id} 
+                          variants={slideInVariants}
+                          className="border-bottom p-4 hover-bg-light"
+                        >
+                          <Row className="align-items-center">
+                            <Col md={8}>
+                              <div className="d-flex align-items-start">
+                                <div className="me-3">
+                                  <div 
+                                    className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold"
+                                    style={{ width: '40px', height: '40px', fontSize: '14px' }}
+                                  >
+                                    #{idx + 1}
+                                  </div>
+                                </div>
+                                <div className="flex-grow-1">
+                                  <h6 className="fw-bold text-dark mb-1">{result.name}</h6>
+                                  <p className="text-muted small mb-1">{result.current_title || 'No title specified'}</p>
+                                  <p className="text-dark small mb-2 lh-sm" style={{
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: 'vertical',
+                                    overflow: 'hidden'
+                                  }}>
+                                    {result.summary || 'No summary available.'}
+                                  </p>
+                                  <div className="d-flex gap-2">
+                                    <Button 
+                                      variant="outline-primary" 
+                                      size="sm" 
+                                      onClick={() => handleDownloadResume(result.file_url, result.file_name)}
+                                      className="d-flex align-items-center"
+                                    >
+                                      <FiDownload size={14} className="me-1" />
+                                      Download
+                                    </Button>
+                                    <Button 
+                                      variant="outline-info" 
+                                      size="sm" 
+                                      onClick={() => handleShowReport(result)}
+                                      className="d-flex align-items-center"
+                                    >
+                                      <FiEye size={14} className="me-1" />
+                                      Report
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            </Col>
+                            <Col md={4} className="text-center">
+                              <div className="position-relative d-inline-block">
+                                <svg width="80" height="80" viewBox="0 0 36 36" className="circular-chart">
+                                  <path className="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" 
+                                        fill="none" stroke="#e6e6e6" strokeWidth="2"/>
+                                  <path className="circle" strokeDasharray={`${Math.round(result.score * 100)}, 100`} 
+                                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                        fill="none" stroke={result.score > 0.7 ? '#28a745' : result.score > 0.5 ? '#ffc107' : '#dc3545'} 
+                                        strokeWidth="2" strokeLinecap="round"/>
+                                </svg>
+                                <div className="position-absolute top-50 start-50 translate-middle">
+                                  <div className="fw-bold text-dark" style={{fontSize: '16px'}}>
+                                    {Math.round(result.score * 100)}%
+                                  </div>
+                                  <div className="small text-muted">Match</div>
+                                </div>
+                              </div>
+                            </Col>
+                          </Row>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </Card.Body>
+                </Card>
+              </motion.div>
+            )}
+          </Col>
+        </Row>
+      </Container>
+
+      {/* Detailed Report Modal */}
       {selectedCandidate && (
         <Modal show={showReportModal} onHide={handleCloseReport} size="lg" centered>
-          <Modal.Header closeButton>
-            <Modal.Title>Detailed Report for {selectedCandidate.name}</Modal.Title>
+          <Modal.Header closeButton className="bg-light">
+            <Modal.Title className="fw-bold">
+              Detailed Report: {selectedCandidate.name}
+            </Modal.Title>
           </Modal.Header>
           <Modal.Body>
-            <p>This report shows the keywords from the job description and indicates which ones were found in the candidate's resume. The score is calculated based only on the "Scoring Keywords" section.</p>
-            <div className="d-flex align-items-center mb-3">
-              <Badge bg="success" className="me-2">Matched</Badge>
-              <Badge bg="secondary" className="me-2">Not Found</Badge>
+            <div className="mb-3">
+              <p className="text-muted">
+                This report shows the keywords from the job description and indicates which ones were found in the candidate's resume. 
+                The score is calculated based only on the "Scoring Keywords" section.
+              </p>
+              <div className="d-flex align-items-center gap-3">
+                <div className="d-flex align-items-center">
+                  <Badge bg="success" className="me-2">Matched</Badge>
+                  <span className="small text-muted">Found in resume</span>
+                </div>
+                <div className="d-flex align-items-center">
+                  <Badge bg="secondary" className="me-2">Not Found</Badge>
+                  <span className="small text-muted">Missing from resume</span>
+                </div>
+              </div>
             </div>
-            <hr/>
-            <ReportSection 
-              title="Scoring Keywords"
-              keywordsData={selectedCandidate.report_details.scoring_keywords} 
-            />
-            <hr/>
-            <ReportSection 
-              title="Additional Keywords (for context)"
-              keywordsData={selectedCandidate.report_details.additional_keywords}
-            />
+            
+            <div className="border-top pt-3">
+              <ReportSection 
+                title="🎯 Scoring Keywords"
+                keywordsData={selectedCandidate.report_details.scoring_keywords} 
+              />
+              
+              <div className="border-top pt-3 mt-3">
+                <ReportSection 
+                  title="📋 Additional Keywords (for context)"
+                  keywordsData={selectedCandidate.report_details.additional_keywords}
+                />
+              </div>
+            </div>
           </Modal.Body>
-          <Modal.Footer>
+          <Modal.Footer className="bg-light">
             <Button variant="secondary" onClick={handleCloseReport}>
-              Close
+              Close Report
+            </Button>
+            <Button 
+              variant="primary" 
+              onClick={() => handleDownloadResume(selectedCandidate.file_url, selectedCandidate.file_name)}
+            >
+              <FiDownload className="me-1" />
+              Download Resume
             </Button>
           </Modal.Footer>
         </Modal>
       )}
-    </Container>
+
+      <style jsx>{`
+        .hover-bg-light:hover {
+          background-color: #f8f9fa !important;
+          transition: background-color 0.2s ease;
+        }
+        
+        .circular-chart {
+          transform: rotate(-90deg);
+        }
+        
+        .custom-checkbox .form-check-input:checked {
+          background-color: #0d6efd;
+          border-color: #0d6efd;
+        }
+        
+        .transition-all {
+          transition: all 0.3s ease;
+        }
+      `}</style>
+    </div>
   );
 }
 
-// --- MODIFICATION: The main App component now handles routing between login and the main app ---
+// Main App component with routing
 function App() {
     return (
         <AuthProvider>
