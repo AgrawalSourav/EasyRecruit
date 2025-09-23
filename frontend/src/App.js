@@ -431,9 +431,8 @@ const MainApp = () => {
         </Card>
 
         <Row>
-          {/* Left Column - Resume Upload & Job Description */}
+          {/* Left Column - Resume Upload */}
           <Col lg={6}>
-            {/* Resume Upload Section */}
             <motion.div variants={fadeVariants} initial="hidden" animate="visible">
               <Card className="mb-4 border-0 shadow-sm">
                 <Card.Header className="bg-white border-bottom-0 py-3">
@@ -511,18 +510,22 @@ const MainApp = () => {
                 </Card.Body>
               </Card>
             </motion.div>
+          </Col>
 
-            {/* Job Description Section */}
+          {/* Right Column - Job Description & Matching */}
+          <Col lg={6}>
             <motion.div variants={fadeVariants} initial="hidden" animate="visible">
               <Card className="mb-4 border-0 shadow-sm">
                 <Card.Header className="bg-white border-bottom-0 py-3">
                   <div className="d-flex align-items-center">
                     <FiFileText className="text-primary me-2" size={20} />
-                    <h5 className="mb-0 fw-semibold">Job Description</h5>
+                    <h5 className="mb-0 fw-semibold">Job Description & Matching</h5>
                   </div>
                 </Card.Header>
                 <Card.Body>
+                  {/* Job Description Input */}
                   <Form.Group className="mb-3">
+                    <Form.Label className="fw-semibold">Job Description</Form.Label>
                     <Form.Control 
                       as="textarea" 
                       rows={6} 
@@ -532,87 +535,32 @@ const MainApp = () => {
                       className="rounded-3"
                     />
                   </Form.Group>
-                  <div className="d-grid">
-                    <Button 
-                      variant="info" 
-                      onClick={handleExtractKeywords} 
-                      disabled={isExtracting || !jdText.trim()} 
-                      size="lg"
-                      className="fw-semibold text-white"
-                    >
-                      {isExtracting ? (
-                        <><Spinner size="sm" className="me-2"/>Extracting Keywords...</>
-                      ) : (
-                        <><FiZap className="me-2"/>Extract Keywords</>
-                      )}
-                    </Button>
-                  </div>
-                </Card.Body>
-              </Card>
-            </motion.div>
 
-            {/* Extracted Keywords Display */}
-            {extractedKeywords && (
-              <motion.div variants={fadeVariants} initial="hidden" animate="visible">
-                <Card className="mb-4 border-0 shadow-sm">
-                  <Card.Header className="bg-success bg-opacity-10 border-bottom-0 py-3">
-                    <div className="d-flex align-items-center">
-                      <FiCheckCircle className="text-success me-2" size={20} />
-                      <h5 className="mb-0 fw-semibold text-success">Keywords Extracted</h5>
-                    </div>
-                  </Card.Header>
-                  <Card.Body>
-                    <Row>
-                      <Col md={6}>
-                        <h6 className="fw-semibold text-primary mb-2">Required Keywords</h6>
-                        {extractedKeywords.required_keywords && Object.entries(extractedKeywords.required_keywords).map(([cat,list])=>list.length>0&&(
-                          <div key={cat} className="mb-2">
-                            <small className="fw-semibold text-dark d-block">{cat.replace(/_/g,' ').toUpperCase()}</small>
-                            <div className="d-flex flex-wrap gap-1">
-                              {list.map(keyword => (
-                                <Badge key={keyword} bg="primary" className="small fw-normal">{keyword}</Badge>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </Col>
-                      <Col md={6}>
-                        <h6 className="fw-semibold text-secondary mb-2">Preferred Keywords</h6>
-                        {extractedKeywords.preferred_keywords && Object.entries(extractedKeywords.preferred_keywords).map(([cat,list])=>list.length>0&&(
-                          <div key={cat} className="mb-2">
-                            <small className="fw-semibold text-dark d-block">{cat.replace(/_/g,' ').toUpperCase()}</small>
-                            <div className="d-flex flex-wrap gap-1">
-                              {list.map(keyword => (
-                                <Badge key={keyword} bg="secondary" className="small fw-normal">{keyword}</Badge>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </Col>
-                    </Row>
-                  </Card.Body>
-                </Card>
-              </motion.div>
-            )}
-          </Col>
-
-          {/* Right Column - Resume Selection & Matches */}
-          <Col lg={6}>
-            {/* Resume Selection */}
-            <motion.div variants={fadeVariants} initial="hidden" animate="visible">
-              <Card className="mb-4 border-0 shadow-sm">
-                <Card.Header className="bg-white border-bottom-0 py-3">
-                  <div className="d-flex align-items-center">
-                    <FiUser className="text-primary me-2" size={20} />
-                    <h5 className="mb-0 fw-semibold">Select Resumes to Match</h5>
-                  </div>
-                </Card.Header>
-                <Card.Body>
-                  {userResumes.length > 0 ? (
-                    <div style={{maxHeight: '250px', overflowY: 'auto'}}>
-                      {userResumes.map(resume => (
-                        <div key={resume.resume_id} className="border rounded-3 p-3 mb-2 bg-light bg-opacity-50">
+                  {/* Resume Selection Dropdown */}
+                  <Form.Group className="mb-3">
+                    <Form.Label className="fw-semibold">Select Resumes to Match</Form.Label>
+                    {userResumes.length > 0 ? (
+                      <div className="border rounded-3 p-3 bg-light bg-opacity-50" style={{maxHeight: '200px', overflowY: 'auto'}}>
+                        {/* Select All Option */}
+                        <Form.Check 
+                          type="checkbox"
+                          id="select-all-resumes"
+                          label={<span className="fw-semibold text-primary">Select All Resumes</span>}
+                          checked={selectedResumeIds.length === userResumes.length && userResumes.length > 0}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedResumeIds(userResumes.map(resume => resume.resume_id));
+                            } else {
+                              setSelectedResumeIds([]);
+                            }
+                          }}
+                          className="custom-checkbox mb-2 pb-2 border-bottom"
+                        />
+                        
+                        {/* Individual Resume Options */}
+                        {userResumes.map(resume => (
                           <Form.Check 
+                            key={resume.resume_id}
                             type="checkbox"
                             id={`resume-${resume.resume_id}`}
                             label={
@@ -623,127 +571,136 @@ const MainApp = () => {
                             }
                             checked={selectedResumeIds.includes(resume.resume_id)}
                             onChange={() => handleResumeSelection(resume.resume_id)}
-                            className="custom-checkbox"
+                            className="custom-checkbox mb-1"
                           />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-4 text-muted">
-                      <FiClock size={32} className="mb-2" />
-                      <p>No resumes uploaded yet. Please upload some resumes first.</p>
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 text-muted border rounded-3 bg-light">
+                        <FiClock size={24} className="mb-2" />
+                        <p className="mb-0">No resumes uploaded yet. Please upload some resumes first.</p>
+                      </div>
+                    )}
+                  </Form.Group>
 
                   {/* Match Controls */}
-                  <div className="mt-3">
-                    <Row className="align-items-end">
-                      <Col md={6}>
-                        <Form.Group>
-                          <Form.Label className="fw-semibold small">Number of Top Matches</Form.Label>
-                          <Form.Control 
-                            type="number" 
-                            value={topK} 
-                            min={1} 
-                            max={50} 
-                            onChange={e=>setTopK(parseInt(e.target.value)||1)}
-                            className="rounded-3"
-                          />
-                        </Form.Group>
-                      </Col>
-                      <Col md={6}>
-                        <div className="d-grid">
-                          <Button 
-                            variant="success" 
-                            onClick={getMatches} 
-                            disabled={loading || !extractedKeywords || selectedResumeIds.length === 0} 
-                            size="lg"
-                            className="fw-semibold"
-                          >
-                            {loading ? (
-                              <><Spinner size="sm" className="me-2"/>Finding...</>
-                            ) : (
-                              <><FiSearch className="me-2"/>Find Top {topK}</>
-                            )}
-                          </Button>
-                        </div>
-                      </Col>
-                    </Row>
-                  </div>
+                  <Row className="align-items-end">
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label className="fw-semibold">Number of Top Matches</Form.Label>
+                        <Form.Control 
+                          type="number" 
+                          value={topK} 
+                          min={1} 
+                          max={50} 
+                          onChange={e=>setTopK(parseInt(e.target.value)||1)}
+                          className="rounded-3"
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <div className="d-grid mb-3">
+                        <Button 
+                          variant="success" 
+                          onClick={getMatches} 
+                          disabled={loading || !jdText.trim() || selectedResumeIds.length === 0} 
+                          size="lg"
+                          className="fw-semibold"
+                        >
+                          {loading ? (
+                            <><Spinner size="sm" className="me-2"/>Finding...</>
+                          ) : (
+                            <><FiSearch className="me-2"/>Find Top {topK}</>
+                          )}
+                        </Button>
+                      </div>
+                    </Col>
+                  </Row>
+
+                  {/* Show Keywords Button - Only show if keywords have been extracted */}
+                  {extractedKeywords && (
+                    <div className="d-grid">
+                      <Button 
+                        variant="outline-info" 
+                        onClick={() => setShowKeywordsModal(true)}
+                        className="fw-semibold"
+                      >
+                        <FiEye className="me-2"/>View Extracted Keywords
+                      </Button>
+                    </div>
+                  )}
                 </Card.Body>
               </Card>
             </motion.div>
+          </Col>
+        </Row>
 
-            {/* Match Results */}
-            {matchedResults.length > 0 && (
-              <motion.div 
-                variants={staggerContainer}
-                initial="hidden" 
-                animate="visible"
-              >
-                <Card className="border-0 shadow-sm">
-                  <Card.Header className="bg-success bg-opacity-10 border-bottom-0 py-3">
-                    <div className="d-flex align-items-center">
-                      <FiAward className="text-success me-2" size={20} />
-                      <h5 className="mb-0 fw-semibold text-success">Top {matchedResults.length} Matches</h5>
-                    </div>
-                  </Card.Header>
-                  <Card.Body className="p-0">
-                    <div style={{maxHeight: '500px', overflowY: 'auto'}}>
-                      {matchedResults.map((result, idx) => (
-                        <motion.div 
-                          key={result.resume_id} 
-                          variants={slideInVariants}
-                          className="border-bottom p-4 hover-bg-light"
-                        >
-                          <Row className="align-items-center">
-                            <Col md={8}>
-                              <div className="d-flex align-items-start">
-                                <div className="me-3">
-                                  <div 
-                                    className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold"
-                                    style={{ width: '40px', height: '40px', fontSize: '14px' }}
-                                  >
-                                    #{idx + 1}
-                                  </div>
-                                </div>
-                                <div className="flex-grow-1">
-                                  <h6 className="fw-bold text-dark mb-1">{result.name}</h6>
-                                  <p className="text-muted small mb-1">{result.current_title || 'No title specified'}</p>
-                                  <p className="text-dark small mb-2 lh-sm" style={{
-                                    display: '-webkit-box',
-                                    WebkitLineClamp: 2,
-                                    WebkitBoxOrient: 'vertical',
-                                    overflow: 'hidden'
-                                  }}>
-                                    {result.summary || 'No summary available.'}
-                                  </p>
-                                  <div className="d-flex gap-2">
-                                    <Button 
-                                      variant="outline-primary" 
-                                      size="sm" 
-                                      onClick={() => handleDownloadResume(result.file_url, result.file_name)}
-                                      className="d-flex align-items-center"
-                                    >
-                                      <FiDownload size={14} className="me-1" />
-                                      Download
-                                    </Button>
-                                    <Button 
-                                      variant="outline-info" 
-                                      size="sm" 
-                                      onClick={() => handleShowReport(result)}
-                                      className="d-flex align-items-center"
-                                    >
-                                      <FiEye size={14} className="me-1" />
-                                      Report
-                                    </Button>
-                                  </div>
-                                </div>
+        {/* Match Results - Full Width */}
+        {matchedResults.length > 0 && (
+          <motion.div 
+            variants={staggerContainer}
+            initial="hidden" 
+            animate="visible"
+            className="mt-4"
+          >
+            <Card className="border-0 shadow-sm">
+              <Card.Header className="bg-success bg-opacity-10 border-bottom-0 py-3">
+                <div className="d-flex align-items-center">
+                  <FiAward className="text-success me-2" size={20} />
+                  <h5 className="mb-0 fw-semibold text-success">Top {matchedResults.length} Matches</h5>
+                </div>
+              </Card.Header>
+              <Card.Body className="p-0">
+                <Row className="g-0">
+                  {matchedResults.map((result, idx) => (
+                    <Col lg={6} key={result.resume_id}>
+                      <motion.div 
+                        variants={slideInVariants}
+                        className="border-bottom border-end p-4 hover-bg-light h-100"
+                      >
+                        <div className="d-flex align-items-start">
+                          <div className="me-3">
+                            <div 
+                              className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold"
+                              style={{ width: '40px', height: '40px', fontSize: '14px' }}
+                            >
+                              #{idx + 1}
+                            </div>
+                          </div>
+                          <div className="flex-grow-1">
+                            <h6 className="fw-bold text-dark mb-1">{result.name}</h6>
+                            <p className="text-muted small mb-1">{result.current_title || 'No title specified'}</p>
+                            <p className="text-dark small mb-2 lh-sm" style={{
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden'
+                            }}>
+                              {result.summary || 'No summary available.'}
+                            </p>
+                            <div className="d-flex justify-content-between align-items-center">
+                              <div className="d-flex gap-2">
+                                <Button 
+                                  variant="outline-primary" 
+                                  size="sm" 
+                                  onClick={() => handleDownloadResume(result.file_url, result.file_name)}
+                                  className="d-flex align-items-center"
+                                >
+                                  <FiDownload size={14} className="me-1" />
+                                  Download
+                                </Button>
+                                <Button 
+                                  variant="outline-info" 
+                                  size="sm" 
+                                  onClick={() => handleShowReport(result)}
+                                  className="d-flex align-items-center"
+                                >
+                                  <FiEye size={14} className="me-1" />
+                                  Report
+                                </Button>
                               </div>
-                            </Col>
-                            <Col md={4} className="text-center">
-                              <div className="position-relative d-inline-block">
-                                <svg width="80" height="80" viewBox="0 0 36 36" className="circular-chart">
+                              <div className="position-relative">
+                                <svg width="60" height="60" viewBox="0 0 36 36" className="circular-chart">
                                   <path className="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" 
                                         fill="none" stroke="#e6e6e6" strokeWidth="2"/>
                                   <path className="circle" strokeDasharray={`${Math.round(result.score * 100)}, 100`} 
@@ -751,24 +708,23 @@ const MainApp = () => {
                                         fill="none" stroke={result.score > 0.7 ? '#28a745' : result.score > 0.5 ? '#ffc107' : '#dc3545'} 
                                         strokeWidth="2" strokeLinecap="round"/>
                                 </svg>
-                                <div className="position-absolute top-50 start-50 translate-middle">
-                                  <div className="fw-bold text-dark" style={{fontSize: '16px'}}>
+                                <div className="position-absolute top-50 start-50 translate-middle text-center">
+                                  <div className="fw-bold text-dark" style={{fontSize: '12px'}}>
                                     {Math.round(result.score * 100)}%
                                   </div>
-                                  <div className="small text-muted">Match</div>
                                 </div>
                               </div>
-                            </Col>
-                          </Row>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </Card.Body>
-                </Card>
-              </motion.div>
-            )}
-          </Col>
-        </Row>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    </Col>
+                  ))}
+                </Row>
+              </Card.Body>
+            </Card>
+          </motion.div>
+        )}
       </Container>
 
       {/* Detailed Report Modal */}
