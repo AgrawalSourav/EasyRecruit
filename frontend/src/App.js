@@ -11,7 +11,7 @@ import {
 import { 
   FiUpload, FiFileText, FiSearch, FiAward, FiLogOut, 
   FiUser, FiTarget, FiTrendingUp, FiDownload, FiEye,
-  FiCheckCircle, FiClock, FiZap
+  FiCheckCircle, FiClock, FiZap, FiEyeOff
 } from 'react-icons/fi';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
@@ -232,13 +232,14 @@ const MainApp = () => {
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [extractedKeywords, setExtractedKeywords] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [isMatching, setIsMatching] = useState(false);
   const [uploadLoading, setUploadLoading] = useState(false);
-  const [isExtracting, setIsExtracting] = useState(false);
   const [alert, setAlert] = useState({ show: false, message: '', type: 'info' });
   const [isDragging, setIsDragging] = useState(false);
   const [userResumes, setUserResumes] = useState([]);
-  const [selectedResumeIds, setSelectedResumeIds] = useState([]);
+  const [selectedResumeOption, setSelectedResumeOption] = useState('');
+  const [showExtractedKeywords, setShowExtractedKeywords] = useState(false);
+
 
   const showAlert = (message, type = 'info', duration = 6000) => {
       setAlert({ show: true, message, type });
@@ -254,14 +255,6 @@ const MainApp = () => {
   useEffect(() => {
     fetchUserResumes();
   }, []);
-
-  const handleResumeSelection = (resumeId) => {
-    setSelectedResumeIds(prev =>
-      prev.includes(resumeId)
-        ? prev.filter(id => id !== resumeId)
-        : [...prev, resumeId]
-    );
-  };
 
   // File Handlers
   const handleFileChange = files => setSelectedFiles(Array.from(files));
@@ -286,24 +279,33 @@ const MainApp = () => {
     }
   };
 
-  const handleExtractKeywords = async () => {
-    if(!jdText.trim()) { showAlert('Enter a JD first.', 'warning'); return; }
-    setIsExtracting(true); setExtractedKeywords(null);
-    try {
-      const response = await apiClient.post(`${API_BASE_URL}/extract-keywords`, { job_description: jdText });
-      setExtractedKeywords(response.data); showAlert('✅ Keywords extracted!', 'success');
-    } catch { showAlert('❌ Error extracting keywords.', 'danger'); }
-    finally { setIsExtracting(false); }
-  };
-
-  const getMatches = async () => {
+  const handleFindTopMatches = async () => {
     if (!jdText.trim()) { showAlert('Please enter a Job Description.', 'warning'); return; }
-    if (!extractedKeywords) { showAlert('Please extract keywords before finding matches.', 'warning'); return; }
-    if (selectedResumeIds.length === 0) { showAlert('Please select at least one resume to match.', 'warning'); return; }
+    if (!selectedResumeOption) { showAlert('Please select which resumes to match against.', 'warning'); return; }
     
-    setLoading(true);
+    setIsMatching(true);
+    setMatchedResults([]);
+    setExtractedKeywords(null);
+    setShowExtractedKeywords(false);
+    
     try {
-      const payload = { keywords: extractedKeywords, top_k: topK, resume_ids: selectedResumeIds};
+      // Step 1: Extract keywords silently
+      const keywordsResponse = await apiClient.post('/extract-keywords', { job_description: jdText });
+      const keywords = keywordsResponse.data;
+      setExtractedKeywords(keywords);
+      
+      // Step 2: Prepare resume IDs based on dropdown selection
+      const resumeIdsToMatch = selectedResumeOption === 'all'
+        ? userResumes.map(r => r.resume_id)
+        : [parseInt(selectedResumeOption, 10)];
+
+      if (resumeIdsToMatch.length === 0) {
+        showAlert('No resumes are available to match.', 'info');
+        return;
+      }
+      
+      // Step 3: Find matches
+      const payload = { keywords, top_k: topK, resume_ids: resumeIdsToMatch };
       const response = await apiClient.post('/match', payload);
       const results = response.data.results || [];
       setMatchedResults(results); 
@@ -311,10 +313,14 @@ const MainApp = () => {
       if (results.length > 0) {
         showAlert(`Found ${results.length} matches!`, 'success');
       } else {
-        showAlert('ℹ️ No matching resumes found for the given keywords.', 'info');
+        showAlert('ℹ️ No matching resumes found for the given criteria.', 'info');
       }
-    } catch { showAlert('Error getting matches.', 'danger'); }
-    finally { setLoading(false); }
+    } catch (err) {
+      console.error("Matching Error:", err);
+      showAlert('An error occurred while finding matches.', 'danger');
+    } finally {
+      setIsMatching(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -402,18 +408,18 @@ const MainApp = () => {
                        style={{ width: '60px', height: '60px' }}>
                     <FiUpload size={24} />
                   </div>
-                  <h6 className="fw-semibold">Upload Resumes</h6>
-                  <small className="text-muted">Add candidate resumes</small>
+                  <h6 className="fw-semibold">1. Upload Resumes</h6>
+                  <small className="text-muted">Add to your library</small>
                 </div>
               </Col>
               <Col md={4}>
                 <div className="d-flex flex-column align-items-center">
-                  <div className={`rounded-circle d-flex align-items-center justify-content-center mb-2 ${extractedKeywords ? 'bg-success text-white' : 'bg-light text-muted'}`} 
+                  <div className={`rounded-circle d-flex align-items-center justify-content-center mb-2 ${jdText ? 'bg-success text-white' : 'bg-light text-muted'}`} 
                        style={{ width: '60px', height: '60px' }}>
                     <FiFileText size={24} />
                   </div>
-                  <h6 className="fw-semibold">Extract Keywords</h6>
-                  <small className="text-muted">Analyze job description</small>
+                  <h6 className="fw-semibold">2. Enter Job Details</h6>
+                  <small className="text-muted">Paste description & select resumes</small>
                 </div>
               </Col>
               <Col md={4}>
@@ -422,17 +428,17 @@ const MainApp = () => {
                        style={{ width: '60px', height: '60px' }}>
                     <FiTrendingUp size={24} />
                   </div>
-                  <h6 className="fw-semibold">Find Matches</h6>
+                  <h6 className="fw-semibold">3. Find Matches</h6>
                   <small className="text-muted">Get top candidates</small>
                 </div>
               </Col>
             </Row>
           </Card.Body>
         </Card>
-
-        <Row>
-          {/* Left Column - Resume Upload */}
-          <Col lg={6}>
+        
+        <Row className="justify-content-center">
+          <Col lg={10} xl={8}>
+            {/* Resume Upload Section */}
             <motion.div variants={fadeVariants} initial="hidden" animate="visible">
               <Card className="mb-4 border-0 shadow-sm">
                 <Card.Header className="bg-white border-bottom-0 py-3">
@@ -496,7 +502,6 @@ const MainApp = () => {
                     </Button>
                   </div>
 
-                  {/* Display uploaded resumes count */}
                   {userResumes.length > 0 && (
                     <div className="mt-3 p-3 bg-success bg-opacity-10 rounded-3">
                       <div className="d-flex align-items-center">
@@ -510,10 +515,8 @@ const MainApp = () => {
                 </Card.Body>
               </Card>
             </motion.div>
-          </Col>
 
-          {/* Right Column - Job Description & Matching */}
-          <Col lg={6}>
+            {/* Job Description & Matching Section */}
             <motion.div variants={fadeVariants} initial="hidden" animate="visible">
               <Card className="mb-4 border-0 shadow-sm">
                 <Card.Header className="bg-white border-bottom-0 py-3">
@@ -523,184 +526,196 @@ const MainApp = () => {
                   </div>
                 </Card.Header>
                 <Card.Body>
-                  {/* Job Description Input */}
                   <Form.Group className="mb-3">
-                    <Form.Label className="fw-semibold">Job Description</Form.Label>
                     <Form.Control 
                       as="textarea" 
-                      rows={6} 
+                      rows={8} 
                       value={jdText} 
                       onChange={e=>setJdText(e.target.value)} 
                       placeholder="Paste the job description here..."
                       className="rounded-3"
                     />
                   </Form.Group>
-
-                  {/* Resume Selection Dropdown */}
+                  
                   <Form.Group className="mb-3">
-                    <Form.Label className="fw-semibold">Select Resumes to Match</Form.Label>
-                    {userResumes.length > 0 ? (
-                      <div className="border rounded-3 p-3 bg-light bg-opacity-50" style={{maxHeight: '200px', overflowY: 'auto'}}>
-                        {/* Select All Option */}
-                        <Form.Check 
-                          type="checkbox"
-                          id="select-all-resumes"
-                          label={<span className="fw-semibold text-primary">Select All Resumes</span>}
-                          checked={selectedResumeIds.length === userResumes.length && userResumes.length > 0}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedResumeIds(userResumes.map(resume => resume.resume_id));
-                            } else {
-                              setSelectedResumeIds([]);
-                            }
-                          }}
-                          className="custom-checkbox mb-2 pb-2 border-bottom"
-                        />
-                        
-                        {/* Individual Resume Options */}
+                    <Form.Label className="fw-semibold">Match Against</Form.Label>
+                    <Form.Select
+                        aria-label="Select Resumes to Match"
+                        value={selectedResumeOption}
+                        onChange={e => setSelectedResumeOption(e.target.value)}
+                        disabled={userResumes.length === 0}
+                    >
+                        <option value="">-- Choose which resumes to match --</option>
+                        <option value="all">All ({userResumes.length}) Resumes</option>
                         {userResumes.map(resume => (
-                          <Form.Check 
-                            key={resume.resume_id}
-                            type="checkbox"
-                            id={`resume-${resume.resume_id}`}
-                            label={
-                              <div>
-                                <div className="fw-semibold text-dark">{resume.candidate_name || 'Unknown Candidate'}</div>
-                                <small className="text-muted">{resume.file_name}</small>
-                              </div>
-                            }
-                            checked={selectedResumeIds.includes(resume.resume_id)}
-                            onChange={() => handleResumeSelection(resume.resume_id)}
-                            className="custom-checkbox mb-1"
-                          />
+                            <option key={resume.resume_id} value={resume.resume_id}>
+                                {resume.candidate_name || resume.file_name}
+                            </option>
                         ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-4 text-muted border rounded-3 bg-light">
-                        <FiClock size={24} className="mb-2" />
-                        <p className="mb-0">No resumes uploaded yet. Please upload some resumes first.</p>
-                      </div>
-                    )}
+                    </Form.Select>
                   </Form.Group>
 
-                  {/* Match Controls */}
                   <Row className="align-items-end">
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label className="fw-semibold">Number of Top Matches</Form.Label>
-                        <Form.Control 
-                          type="number" 
-                          value={topK} 
-                          min={1} 
-                          max={50} 
-                          onChange={e=>setTopK(parseInt(e.target.value)||1)}
-                          className="rounded-3"
-                        />
-                      </Form.Group>
+                    <Col xs={12} sm={5} className="mb-3 mb-sm-0">
+                        <Form.Group>
+                            <Form.Label className="fw-semibold small">Number of Top Matches</Form.Label>
+                            <Form.Control 
+                                type="number" 
+                                value={topK} 
+                                min={1} 
+                                max={50} 
+                                onChange={e => setTopK(parseInt(e.target.value) || 1)}
+                                className="rounded-3"
+                            />
+                        </Form.Group>
                     </Col>
-                    <Col md={6}>
-                      <div className="d-grid mb-3">
-                        <Button 
-                          variant="success" 
-                          onClick={getMatches} 
-                          disabled={loading || !jdText.trim() || selectedResumeIds.length === 0} 
-                          size="lg"
-                          className="fw-semibold"
-                        >
-                          {loading ? (
-                            <><Spinner size="sm" className="me-2"/>Finding...</>
-                          ) : (
-                            <><FiSearch className="me-2"/>Find Top {topK}</>
-                          )}
-                        </Button>
-                      </div>
+                    <Col xs={12} sm={7}>
+                        <div className="d-grid">
+                            <Button 
+                                variant="success" 
+                                onClick={handleFindTopMatches} 
+                                disabled={isMatching || !jdText.trim() || !selectedResumeOption || userResumes.length === 0} 
+                                size="lg"
+                                className="fw-semibold"
+                            >
+                                {isMatching ? (
+                                    <><Spinner size="sm" className="me-2"/>Searching...</>
+                                ) : (
+                                    <><FiSearch className="me-2"/>Find Top Matches</>
+                                )}
+                            </Button>
+                        </div>
                     </Col>
                   </Row>
-
-                  {/* Show Keywords Button - Only show if keywords have been extracted */}
-                  {extractedKeywords && (
-                    <div className="d-grid">
-                      <Button 
-                        variant="outline-info" 
-                        onClick={() => setShowKeywordsModal(true)}
-                        className="fw-semibold"
-                      >
-                        <FiEye className="me-2"/>View Extracted Keywords
-                      </Button>
-                    </div>
-                  )}
                 </Card.Body>
               </Card>
             </motion.div>
-          </Col>
-        </Row>
+            
+            {/* Extracted Keywords Trigger & Display */}
+            {extractedKeywords && (
+              <div className="text-center mb-3">
+                <Button variant="link" onClick={() => setShowExtractedKeywords(!showExtractedKeywords)}>
+                  {showExtractedKeywords ? <FiEyeOff className="me-1" /> : <FiEye className="me-1" />}
+                  {showExtractedKeywords ? 'Hide' : 'Show'} Extracted Keywords
+                </Button>
+              </div>
+            )}
 
-        {/* Match Results - Full Width */}
-        {matchedResults.length > 0 && (
-          <motion.div 
-            variants={staggerContainer}
-            initial="hidden" 
-            animate="visible"
-            className="mt-4"
-          >
-            <Card className="border-0 shadow-sm">
-              <Card.Header className="bg-success bg-opacity-10 border-bottom-0 py-3">
-                <div className="d-flex align-items-center">
-                  <FiAward className="text-success me-2" size={20} />
-                  <h5 className="mb-0 fw-semibold text-success">Top {matchedResults.length} Matches</h5>
-                </div>
-              </Card.Header>
-              <Card.Body className="p-0">
-                <Row className="g-0">
-                  {matchedResults.map((result, idx) => (
-                    <Col lg={6} key={result.resume_id}>
-                      <motion.div 
-                        variants={slideInVariants}
-                        className="border-bottom border-end p-4 hover-bg-light h-100"
-                      >
-                        <div className="d-flex align-items-start">
-                          <div className="me-3">
-                            <div 
-                              className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold"
-                              style={{ width: '40px', height: '40px', fontSize: '14px' }}
-                            >
-                              #{idx + 1}
-                            </div>
-                          </div>
-                          <div className="flex-grow-1">
-                            <h6 className="fw-bold text-dark mb-1">{result.name}</h6>
-                            <p className="text-muted small mb-1">{result.current_title || 'No title specified'}</p>
-                            <p className="text-dark small mb-2 lh-sm" style={{
-                              display: '-webkit-box',
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: 'vertical',
-                              overflow: 'hidden'
-                            }}>
-                              {result.summary || 'No summary available.'}
-                            </p>
-                            <div className="d-flex justify-content-between align-items-center">
-                              <div className="d-flex gap-2">
-                                <Button 
-                                  variant="outline-primary" 
-                                  size="sm" 
-                                  onClick={() => handleDownloadResume(result.file_url, result.file_name)}
-                                  className="d-flex align-items-center"
-                                >
-                                  <FiDownload size={14} className="me-1" />
-                                  Download
-                                </Button>
-                                <Button 
-                                  variant="outline-info" 
-                                  size="sm" 
-                                  onClick={() => handleShowReport(result)}
-                                  className="d-flex align-items-center"
-                                >
-                                  <FiEye size={14} className="me-1" />
-                                  Report
-                                </Button>
+            <AnimatePresence>
+              {showExtractedKeywords && extractedKeywords && (
+                <motion.div variants={fadeVariants} initial="hidden" animate="visible" exit="hidden">
+                  <Card className="mb-4 border-0 shadow-sm">
+                    <Card.Header className="bg-success bg-opacity-10 border-bottom-0 py-3">
+                      <div className="d-flex align-items-center">
+                        <FiCheckCircle className="text-success me-2" size={20} />
+                        <h5 className="mb-0 fw-semibold text-success">Keywords Extracted</h5>
+                      </div>
+                    </Card.Header>
+                    <Card.Body>
+                      <Row>
+                        <Col md={6}>
+                          <h6 className="fw-semibold text-primary mb-2">Required Keywords</h6>
+                          {extractedKeywords.required_keywords && Object.entries(extractedKeywords.required_keywords).map(([cat,list])=>list.length>0&&(
+                            <div key={cat} className="mb-2">
+                              <small className="fw-semibold text-dark d-block">{cat.replace(/_/g,' ').toUpperCase()}</small>
+                              <div className="d-flex flex-wrap gap-1">
+                                {list.map(keyword => (
+                                  <Badge key={keyword} bg="primary" className="small fw-normal">{keyword}</Badge>
+                                ))}
                               </div>
-                              <div className="position-relative">
-                                <svg width="60" height="60" viewBox="0 0 36 36" className="circular-chart">
+                            </div>
+                          ))}
+                        </Col>
+                        <Col md={6}>
+                          <h6 className="fw-semibold text-secondary mb-2">Preferred Keywords</h6>
+                          {extractedKeywords.preferred_keywords && Object.entries(extractedKeywords.preferred_keywords).map(([cat,list])=>list.length>0&&(
+                            <div key={cat} className="mb-2">
+                              <small className="fw-semibold text-dark d-block">{cat.replace(/_/g,' ').toUpperCase()}</small>
+                              <div className="d-flex flex-wrap gap-1">
+                                {list.map(keyword => (
+                                  <Badge key={keyword} bg="secondary" className="small fw-normal">{keyword}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </Col>
+                      </Row>
+                    </Card.Body>
+                  </Card>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Match Results */}
+            {matchedResults.length > 0 && (
+              <motion.div 
+                variants={staggerContainer}
+                initial="hidden" 
+                animate="visible"
+              >
+                <Card className="border-0 shadow-sm">
+                  <Card.Header className="bg-success bg-opacity-10 border-bottom-0 py-3">
+                    <div className="d-flex align-items-center">
+                      <FiAward className="text-success me-2" size={20} />
+                      <h5 className="mb-0 fw-semibold text-success">Top {matchedResults.length} Matches</h5>
+                    </div>
+                  </Card.Header>
+                  <Card.Body className="p-0">
+                    <div style={{maxHeight: '500px', overflowY: 'auto'}}>
+                      {matchedResults.map((result, idx) => (
+                        <motion.div 
+                          key={result.resume_id} 
+                          variants={slideInVariants}
+                          className="border-bottom p-4 hover-bg-light"
+                        >
+                          <Row className="align-items-center">
+                            <Col md={8}>
+                              <div className="d-flex align-items-start">
+                                <div className="me-3">
+                                  <div 
+                                    className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold"
+                                    style={{ width: '40px', height: '40px', fontSize: '14px' }}
+                                  >
+                                    #{idx + 1}
+                                  </div>
+                                </div>
+                                <div className="flex-grow-1">
+                                  <h6 className="fw-bold text-dark mb-1">{result.name}</h6>
+                                  <p className="text-muted small mb-1">{result.current_title || 'No title specified'}</p>
+                                  <p className="text-dark small mb-2 lh-sm" style={{
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: 'vertical',
+                                    overflow: 'hidden'
+                                  }}>
+                                    {result.summary || 'No summary available.'}
+                                  </p>
+                                  <div className="d-flex gap-2">
+                                    <Button 
+                                      variant="outline-primary" 
+                                      size="sm" 
+                                      onClick={() => handleDownloadResume(result.file_url, result.file_name)}
+                                      className="d-flex align-items-center"
+                                    >
+                                      <FiDownload size={14} className="me-1" />
+                                      Download
+                                    </Button>
+                                    <Button 
+                                      variant="outline-info" 
+                                      size="sm" 
+                                      onClick={() => handleShowReport(result)}
+                                      className="d-flex align-items-center"
+                                    >
+                                      <FiEye size={14} className="me-1" />
+                                      Report
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            </Col>
+                            <Col md={4} className="text-center">
+                              <div className="position-relative d-inline-block">
+                                <svg width="80" height="80" viewBox="0 0 36 36" className="circular-chart">
                                   <path className="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" 
                                         fill="none" stroke="#e6e6e6" strokeWidth="2"/>
                                   <path className="circle" strokeDasharray={`${Math.round(result.score * 100)}, 100`} 
@@ -708,23 +723,24 @@ const MainApp = () => {
                                         fill="none" stroke={result.score > 0.7 ? '#28a745' : result.score > 0.5 ? '#ffc107' : '#dc3545'} 
                                         strokeWidth="2" strokeLinecap="round"/>
                                 </svg>
-                                <div className="position-absolute top-50 start-50 translate-middle text-center">
-                                  <div className="fw-bold text-dark" style={{fontSize: '12px'}}>
+                                <div className="position-absolute top-50 start-50 translate-middle">
+                                  <div className="fw-bold text-dark" style={{fontSize: '16px'}}>
                                     {Math.round(result.score * 100)}%
                                   </div>
+                                  <div className="small text-muted">Match</div>
                                 </div>
                               </div>
-                            </div>
-                          </div>
-                        </div>
-                      </motion.div>
-                    </Col>
-                  ))}
-                </Row>
-              </Card.Body>
-            </Card>
-          </motion.div>
-        )}
+                            </Col>
+                          </Row>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </Card.Body>
+                </Card>
+              </motion.div>
+            )}
+          </Col>
+        </Row>
       </Container>
 
       {/* Detailed Report Modal */}
