@@ -237,7 +237,7 @@ const MainApp = () => {
   const [alert, setAlert] = useState({ show: false, message: '', type: 'info' });
   const [isDragging, setIsDragging] = useState(false);
   const [userResumes, setUserResumes] = useState([]);
-  const [selectedResumeOption, setSelectedResumeOption] = useState('');
+  const [selectedResumeIds, setSelectedResumeIds] = useState([]);
   const [showExtractedKeywords, setShowExtractedKeywords] = useState(false);
 
 
@@ -255,6 +255,22 @@ const MainApp = () => {
   useEffect(() => {
     fetchUserResumes();
   }, []);
+
+  const handleResumeSelection = (resumeId) => {
+    setSelectedResumeIds(prev =>
+      prev.includes(resumeId)
+        ? prev.filter(id => id !== resumeId)
+        : [...prev, resumeId]
+    );
+  };
+  
+  const handleSelectAllResumes = (e) => {
+    if (e.target.checked) {
+      setSelectedResumeIds(userResumes.map(r => r.resume_id));
+    } else {
+      setSelectedResumeIds([]);
+    }
+  };
 
   // File Handlers
   const handleFileChange = files => setSelectedFiles(Array.from(files));
@@ -281,7 +297,7 @@ const MainApp = () => {
 
   const handleFindTopMatches = async () => {
     if (!jdText.trim()) { showAlert('Please enter a Job Description.', 'warning'); return; }
-    if (!selectedResumeOption) { showAlert('Please select which resumes to match against.', 'warning'); return; }
+    if (selectedResumeIds.length === 0) { showAlert('Please select at least one resume to match against.', 'warning'); return; }
     
     setIsMatching(true);
     setMatchedResults([]);
@@ -294,18 +310,8 @@ const MainApp = () => {
       const keywords = keywordsResponse.data;
       setExtractedKeywords(keywords);
       
-      // Step 2: Prepare resume IDs based on dropdown selection
-      const resumeIdsToMatch = selectedResumeOption === 'all'
-        ? userResumes.map(r => r.resume_id)
-        : [parseInt(selectedResumeOption, 10)];
-
-      if (resumeIdsToMatch.length === 0) {
-        showAlert('No resumes are available to match.', 'info');
-        return;
-      }
-      
-      // Step 3: Find matches
-      const payload = { keywords, top_k: topK, resume_ids: resumeIdsToMatch };
+      // Step 2: Find matches using selected resume IDs
+      const payload = { keywords, top_k: topK, resume_ids: selectedResumeIds };
       const response = await apiClient.post('/match', payload);
       const results = response.data.results || [];
       setMatchedResults(results); 
@@ -527,6 +533,7 @@ const MainApp = () => {
                 </Card.Header>
                 <Card.Body>
                   <Form.Group className="mb-3">
+                    <Form.Label className="fw-semibold">Job Description</Form.Label>
                     <Form.Control 
                       as="textarea" 
                       rows={8} 
@@ -539,20 +546,34 @@ const MainApp = () => {
                   
                   <Form.Group className="mb-3">
                     <Form.Label className="fw-semibold">Match Against</Form.Label>
-                    <Form.Select
-                        aria-label="Select Resumes to Match"
-                        value={selectedResumeOption}
-                        onChange={e => setSelectedResumeOption(e.target.value)}
-                        disabled={userResumes.length === 0}
-                    >
-                        <option value="">-- Choose which resumes to match --</option>
-                        <option value="all">All ({userResumes.length}) Resumes</option>
-                        {userResumes.map(resume => (
-                            <option key={resume.resume_id} value={resume.resume_id}>
-                                {resume.candidate_name || resume.file_name}
-                            </option>
-                        ))}
-                    </Form.Select>
+                    {userResumes.length > 0 ? (
+                        <div className="border rounded-3 p-3" style={{maxHeight: '200px', overflowY: 'auto'}}>
+                            <Form.Check
+                                type="checkbox"
+                                id="select-all-resumes"
+                                label={`Select All (${selectedResumeIds.length}/${userResumes.length})`}
+                                checked={selectedResumeIds.length === userResumes.length && userResumes.length > 0}
+                                onChange={handleSelectAllResumes}
+                                className="fw-semibold mb-2 border-bottom pb-2"
+                            />
+                            {userResumes.map(resume => (
+                                <Form.Check
+                                    key={resume.resume_id}
+                                    type="checkbox"
+                                    id={`resume-${resume.resume_id}`}
+                                    label={resume.candidate_name || resume.file_name}
+                                    checked={selectedResumeIds.includes(resume.resume_id)}
+                                    onChange={() => handleResumeSelection(resume.resume_id)}
+                                    className="my-1"
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-3 text-muted border rounded-3">
+                            <FiClock size={24} className="mb-2" />
+                            <p className="mb-0 small">No resumes in your library to select.</p>
+                        </div>
+                    )}
                   </Form.Group>
 
                   <Row className="align-items-end">
@@ -574,7 +595,7 @@ const MainApp = () => {
                             <Button 
                                 variant="success" 
                                 onClick={handleFindTopMatches} 
-                                disabled={isMatching || !jdText.trim() || !selectedResumeOption || userResumes.length === 0} 
+                                disabled={isMatching || !jdText.trim() || selectedResumeIds.length === 0} 
                                 size="lg"
                                 className="fw-semibold"
                             >
@@ -682,6 +703,10 @@ const MainApp = () => {
                                 <div className="flex-grow-1">
                                   <h6 className="fw-bold text-dark mb-1">{result.name}</h6>
                                   <p className="text-muted small mb-1">{result.current_title || 'No title specified'}</p>
+                                  <p className="text-muted small mb-2 fst-italic">
+                                      <FiFileText size={12} className="me-1" />
+                                      {result.file_name}
+                                  </p>
                                   <p className="text-dark small mb-2 lh-sm" style={{
                                     display: '-webkit-box',
                                     WebkitLineClamp: 2,
