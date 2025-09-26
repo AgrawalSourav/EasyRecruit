@@ -449,7 +449,7 @@ def upload_resumes():
                     searchable_text = parsed_resume.get('searchable_content', resume_text)
                     prompt = RESUME_KWD_EXTRACTION_PROMPT.format(text_input=searchable_text)
                     try:
-                        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+                        model = genai.GenerativeModel('gemini-2.5-flash-lite-preview-09-2025')
                         generation_config = genai.types.GenerationConfig(response_mime_type="application/json")
                         response = model.generate_content(prompt, generation_config=generation_config)
 
