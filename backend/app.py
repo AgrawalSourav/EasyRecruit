@@ -683,7 +683,7 @@ def match_resumes():
             final_composition_weights['required'] = 0.0
             final_composition_weights['preferred'] = 1.0
         elif not has_required and not has_preferred:
-            return jsonify({'results':, 'message': 'No scorable keywords found in the job description.'})
+            return jsonify({'results': [], 'message': 'No scorable keywords found in the job description.'})
 
         # Adjust nested weights for the 'required' category
         final_required_weights = {}
