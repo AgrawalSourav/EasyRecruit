@@ -651,18 +651,39 @@ def match_resumes():
         if not jd_keywords_categorized:
             return jsonify({'error': 'No keywords provided for matching'}), 400
 
-        # Calculate the max possible score by iterating through the nested structure
-        max_possible_score = 0
-        for importance, categories in jd_keywords_categorized.items(): # e.g., importance = "required_keywords"
-            for category, keywords in categories.items(): # e.g., category = "hard_skills"
-                if category in SCORING_CATEGORIES:
-                    # Get the correct weight for 'required' or 'preferred'
-                    weight = KEYWORD_WEIGHTS.get(importance.replace('_keywords', ''), {}).get(category, 1)
-                    max_possible_score += len(keywords) * weight
+        # --- Calculate separate max scores for required and preferred keywords ---
+        max_required_score = 0
+        max_preferred_score = 0
 
-        if max_possible_score == 0:
-            return jsonify({'results': [], 'message': 'No relevant keywords to score against in the provided job description.'})
+        # Calculate max score for required keywords
+        for category, keywords in jd_keywords_categorized.get('required_keywords', {}).items():
+            if category in SCORING_CATEGORIES:
+                weight = KEYWORD_WEIGHTS.get('required', {}).get(category, 1)
+                max_required_score += len(keywords) * weight
 
+        # Calculate max score for preferred keywords
+        for category, keywords in jd_keywords_categorized.get('preferred_keywords', {}).items():
+            if category in SCORING_CATEGORIES:
+                weight = KEYWORD_WEIGHTS.get('preferred', {}).get(category, 1)
+                max_preferred_score += len(keywords) * weight
+        
+        if max_required_score == 0 and max_preferred_score == 0:
+             return jsonify({'results': [], 'message': 'No relevant keywords to score against in the provided job description.'})
+
+        # --- NEW: Dynamically adjust weights based on available keywords ---
+        required_weight = 0.8
+        preferred_weight = 0.2
+        
+        if max_required_score > 0 and max_preferred_score == 0:
+            # Only required keywords exist, so they get 100% of the weight
+            required_weight = 1.0
+            preferred_weight = 0.0
+        elif max_required_score == 0 and max_preferred_score > 0:
+            # Only preferred keywords exist, so they get 100% of the weight
+            required_weight = 0.0
+            preferred_weight = 1.0
+        
+        # If both exist, the default 80/20 weights are used.
         # Build query based on whether specific resumes were selected
         base_query = Resume.query.filter_by(owner=current_user)
         if resume_ids_to_match and isinstance(resume_ids_to_match, list):
@@ -681,7 +702,9 @@ def match_resumes():
                 print(resume_keywords)
                 print("-------------------------------------------------")
 
-            current_score, report_details = 0, {"scoring_keywords": {}, "additional_keywords": {}}
+            current_required_score = 0
+            current_preferred_score = 0
+            report_details = {"scoring_keywords": {}, "additional_keywords": {}}
             
             # Iterate through the nested JD keywords to compare against the flat resume keyword list
             for importance, categories in jd_keywords_categorized.items():
@@ -692,23 +715,32 @@ def match_resumes():
                     if category not in report_target:
                         report_target[category] = {'matched': [], 'missing': []}
 
-                    weight = KEYWORD_WEIGHTS.get(importance.replace('_keywords', ''), {}).get(category, 1)
+                    importance_key = importance.replace('_keywords', '')
+                    weight = KEYWORD_WEIGHTS.get(importance_key, {}).get(category, 1)
 
                     for kw in keywords:
                         if kw.lower() in resume_keywords:
                             report_target[category]['matched'].append(kw)
                             if is_scoring_cat:
-                                current_score += weight
+                                if importance_key == 'required':
+                                    current_required_score += weight
+                                elif importance_key == 'preferred':
+                                    current_preferred_score += weight
                         else:
                             report_target[category]['missing'].append(kw)
             
-            normalized_score = (current_score / max_possible_score) if max_possible_score > 0 else 0
+            # --- Calculate final weighted score with DYNAMIC weights ---
+            normalized_required = (current_required_score / max_required_score) if max_required_score > 0 else 0
+            normalized_preferred = (current_preferred_score / max_preferred_score) if max_preferred_score > 0 else 0
+            
+            # --- CHANGED: This now uses the dynamic weights calculated earlier ---
+            final_normalized_score = (normalized_required * required_weight) + (normalized_preferred * preferred_weight)
             
             # --- NEW FEATURE: Add a direct download URL to the result ---
             file_url = f"/download/resume/{resume.resume_id}"
             # ---
             scored_resumes.append({
-                "resume_id": resume.resume_id, "name": resume.name, "score": normalized_score, "current_title": resume.current_title,
+                "resume_id": resume.resume_id, "name": resume.name, "score": final_normalized_score, "current_title": resume.current_title,
                 "summary": (resume.summary[:250] + "...") if resume.summary and len(resume.summary) > 250 else resume.summary,
                 "file_name": resume.file_name, "report_details": report_details,
                 "file_url": file_url
