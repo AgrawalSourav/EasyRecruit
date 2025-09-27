@@ -97,103 +97,87 @@ print("All components loaded successfully!")
 # This prompt will now be used by both functions
 RESUME_KWD_EXTRACTION_PROMPT = """
     CRITICAL: You MUST return ONLY valid JSON. NO explanations, NO additional text, NO markdown formatting.
-    
-    === TASK: RESEARCH-VALIDATED KEYWORD EXTRACTION ===
-    Extract ALL essential keywords from the resume using academic research-validated methodologies for optimal ATS and semantic matching. This system implements findings from NLP research papers and commercial platforms for production-level resume matching.
+
+    === TASK: STRICT KEYWORD EXTRACTION FROM RESUME FOR DIRECT MATCHING ===
+    Extract ALL **explicitly mentioned** keywords from the resume. This system prioritizes the literal presence of terms for direct, exact string matching. DO NOT infer, generalize, or semantically expand beyond the explicit text.
 
     === REQUIRED JSON OUTPUT FORMAT ===
-            {{
-                "hard_skills": [],
-                "tools_and_platforms": [],
-                "methodologies_and_frameworks": [],
-                "domain_knowledge": [],
-                "qualifications": [],
-                "experience_indicators": []
-            }}
-    
-            === ESSENTIAL KEYWORD CATEGORIES (Research-Validated) ===
+        {{
+            "hard_skills": [],
+            "tools_and_platforms": [],
+            "methodologies_and_frameworks": [],
+            "qualifications": [],
+            "experience_indicators": []
+        }}
 
-            1. **hard_skills**: Quantifiable, task-oriented technical competencies essential for role performance
-            - Programming languages, analytical methods, technical procedures
-            - Specialized techniques, laboratory methods, engineering processes
-            - Measurable competencies with clear learning pathways
-            - Examples: Python, Statistical Analysis, PCR, Finite Element Analysis, Machine Learning
+        === ESSENTIAL KEYWORD CATEGORIES ===
 
-            2. **tools_and_platforms**: Specific software, hardware, and digital platforms
-            - Development environments, cloud services, collaboration tools
-            - Industry-specific software, machinery, laboratory equipment
-            - Examples: AWS, Git, Salesforce, Docker, Jira, Adobe Creative Suite
+        1. **hard_skills**: Specific, technical, and quantifiable skills explicitly stated in the resume.
+        - Programming languages, analytical methods, technical procedures.
+        - Specialized techniques, engineering processes, specific scientific methods.
+        - Examples: Python, SQL, Data Analysis, C++, JavaScript, AWS Lambda.
 
-            3. **methodologies_and_frameworks**: Named operational and project management approaches
-            - Process improvement systems, development practices, quality standards
-            - Compliance frameworks, industry methodologies
-            - Examples: Agile, Scrum, Lean Six Sigma, DevOps, ISO 27001, GDPR
+        2. **tools_and_platforms**: Named software, hardware, systems, and digital environments explicitly stated in the resume.
+        - Development environments, cloud services, operating systems, databases, specific applications.
+        - Examples: Microsoft Azure, Git, Docker, Kubernetes, Jira, Tableau, Salesforce, SAP.
 
-            4. **domain_knowledge**: Industry-specific expertise and specialized knowledge areas ONLY if explicitly mentioned
-            - Business sectors, functional areas, regulatory knowledge
-            - Theoretical concepts, business frameworks, scientific principles
-            - Examples: Healthcare, FinTech, GAAP, Quantum Mechanics, Supply Chain
-            - **CRITICAL: Only extract if explicitly stated in the job description. Do not infer or assume.**
+        3. **methodologies_and_frameworks**: Named operational approaches, project management methods, and compliance standards explicitly stated in the resume.
+        - Process improvement systems, development practices, quality standards, regulatory frameworks.
+        - Examples: Agile, Scrum, Kanban, ITIL, GAAP, GDPR, ISO 27001, Six Sigma.
 
-            5. **qualifications**: Formal educational credentials, certifications, and licenses
-            - Academic degrees, professional certifications, regulatory licenses
-            - Must be specific titles, not general categories
-            - Examples: Bachelor of Science, PMP, CPA, AWS Solutions Architect, Registered Nurse
+        4. **domain_knowledge**: Explicitly mentioned industry-specific expertise or specialized knowledge areas in the resume.
+        - Business sectors, functional areas, regulatory knowledge, scientific principles.
+        - Examples: FinTech, Healthcare Regulations, Supply Chain Management, Quantum Computing, Clinical Trials.
+        - **CRITICAL: ONLY extract if explicitly stated in the resume. DO NOT infer or assume.**
 
-            6. **experience_indicators**: Quantified experience requirements and seniority markers
-            - Years of experience, proficiency levels, leadership scope
-            - Extract both numbers and context
+        5. **qualifications**: Formal educational credentials, certifications, and licenses, as specific titles, explicitly stated in the resume.
+        - Academic degrees, professional certifications, regulatory licenses.
+        - Examples: Bachelor's Degree in Computer Science, MBA, PMP, CFA, AWS Certified Solutions Architect, RN License.
 
-            === RESEARCH-BASED EXTRACTION METHODOLOGY ===
-            1. SEMANTIC SIGNIFICANCE: Prioritize contextual meaning over frequency - extract keywords based on professional relevance and semantic centrality within the text
-            2. HIERARCHICAL CLASSIFICATION: Use established skill taxonomies (ESCO, O*NET principles) to classify and validate keyword importance
-            3. CONTEXTUAL IMPORTANCE RANKING: Analyze proximity to requirement indicators, repetition patterns, and hierarchical positioning
-            4. DOMAIN-SPECIFIC RELEVANCE: Extract keywords that carry specialized meaning within professional contexts
-            5. COMPREHENSIVE COVERAGE: Capture both explicit mentions and implied competencies from job responsibilities
+        6. **experience_indicators**: Quantified experience mentions and seniority markers found in the resume, including numbers and context.
+        - Years of experience, specific project durations, proficiency levels (e.g., "Senior," "Lead").
+        - Examples: "5+ years of experience," "3-5 years," "Senior Engineer," "Lead Developer," "Proficiency in."
 
-            === ADVANCED EXTRACTION TECHNIQUES ===
+        === STRICT EXTRACTION METHODOLOGY ===
+        1. **EXPLICIT MENTION ONLY**: Extract only terms directly present in the resume. Do not infer, generalize, or semantically expand.
+        2. **LITERAL ACCURACY**: Keywords must be extracted as they appear or as direct, commonly recognized atomic components of compound phrases.
+        3. **CATEGORY-SPECIFIC**: Ensure extracted terms fit precisely into the defined categories.
+        4. **NO INFERENCE**: Do not extract "implied" skills or knowledge unless the skill/knowledge itself is explicitly named.
 
-            **Semantic Role Analysis:**
-            - Extract implied skills from job responsibilities ("manage team" → Leadership, Team Management)
-            - Capture domain expertise from industry context ONLY if explicitly mentioned
-            - **When extracting from action phrases involving interactions with entities or teams, prioritize extracting the implied behavioral or soft skill instead of the named entity or organizational unit.**
-            - **Filter out named entities, department names, or organization titles unless they directly represent candidate-required domain expertise or qualifications.**
-            - **Limit extraction of implied tools and platforms to only those explicitly mentioned or clearly indicated in context. Do not infer specific software or platforms solely from generic terms unless directly named.**
+        === ADVANCED EXTRACTION TECHNIQUES (ADJUSTED FOR STRICT MATCHING) ===
 
-            **Compound Phrase Decomposition:**
-            - "Python and SQL development" → ["Python", "SQL"]  
-            - "Machine learning and AI systems" → ["Machine Learning", "AI", "Artificial Intelligence"]
-            - "Bachelor's in Computer Science or Engineering" → ["Bachelor's in Computer Science", "Bachelor's in Engineering"]
+        **Compound Phrase Decomposition:**
+        - Break down compound terms into individual, searchable keywords.
+        - "Python and SQL development" → ["Python", "SQL"]
+        - "Machine Learning and AI systems" → ["Machine Learning", "AI"]
+        - "Bachelor's in Computer Science or Engineering" → ["Bachelor's in Computer Science", "Bachelor's in Engineering"]
+        - "Microsoft Office Suite" → ["Microsoft Office", "Word", "Excel", "PowerPoint"] (only if components are commonly searched/expected)
 
-            **Contextual Expansion:**
-            - Include both full terms and common abbreviations
-            - Extract synonyms mentioned in context
-            - Capture implied competencies from complex phrases
-            - **Restrict expansion to avoid adding speculative or commonly associated tools/platforms not appearing explicitly or strongly implied by the text.**
+        **Contextual Simplification (formerly 'Expansion'):**
+        - Include common abbreviations if the full term is also present, or vice-versa, only if both are used or one is a very common, direct substitute.
+        - **Strictly limit to direct abbreviations/full terms used within the text or universally understood aliases (e.g., "ML" for "Machine Learning" if ML is used or very common in context).**
+        - **DO NOT add speculative or commonly associated tools/platforms not appearing explicitly or strongly implied by the text.**
 
-            **Industry-Specific Extraction:**
-            - Prioritize domain-relevant terminology
-            - Extract compliance and regulatory terms specific to sector ONLY if explicitly mentioned
-            - Identify industry-standard tools and methodologies ONLY if explicitly mentioned
+        **Atomic Term Prioritization:**
+        - If a phrase like "experience with relational databases like MySQL and PostgreSQL" appears, extract "MySQL" and "PostgreSQL." "Relational Databases" can also be extracted if it's a specific mention.
 
-            === RESEARCH-VALIDATED SUCCESS CRITERIA ===
-            - SEMANTIC PRECISION: Keywords must carry professional significance, not just statistical frequency
-            - COMPREHENSIVE COVERAGE: Extract every skill, tool, qualification, and competency mentioned or implied
-            - CONTEXTUAL ACCURACY: Proper classification based on linguistic cues and placement
-            - ATOMIC GRANULARITY: Break compound phrases into individual, searchable terms
-            - DOMAIN RELEVANCE: Prioritize industry-specific and role-relevant terminology
-            - PRODUCTION QUALITY: Suitable for commercial ATS and semantic matching systems
+        === SUCCESS CRITERIA ===
+        - **EXACTNESS**: Keywords must be direct matches to terms or atomic components found in the resume.
+        - **COMPREHENSIVE COVERAGE**: Extract every explicit skill, tool, qualification, and competency mentioned.
+        - **ATOMIC GRANULARITY**: Break compound phrases into individual, searchable terms suitable for direct string matching.
+        - **NO SEMANTIC INFERENCE**: Avoid any keyword not directly supported by the literal text.
 
-            === CRITICAL REMINDERS ===
-            - RETURN ONLY THE JSON OBJECT
-            - NO EXPLANATIONS, COMMENTARY, OR METADATA
-            - EXTRACT BOTH EXPLICIT AND IMPLIED COMPETENCIES
-            - USE EXACT TERMINOLOGY FROM JOB DESCRIPTION WHEN POSSIBLE
-            - ENSURE ALL ARRAYS CONTAIN INDIVIDUAL ATOMIC KEYWORDS
-            - PRIORITIZE SEMANTIC MEANING OVER WORD FREQUENCY
-            - DO NOT HALLUCINATE OR INFER KEYWORDS NOT PRESENT IN THE TEXT
+        === CRITICAL REMINDERS ===
+        - RETURN ONLY THE JSON OBJECT.
+        - NO EXPLANATIONS, COMMENTARY, OR METADATA.
+        - **EXTRACT ONLY EXPLICITLY STATED COMPETENCIES.**
+        - USE EXACT TERMINOLOGY FROM RESUME.
+        - ENSURE ALL ARRAYS CONTAIN INDIVIDUAL ATOMIC KEYWORDS.
+        - **PRIORITIZE LITERAL PRESENCE OVER SEMANTIC MEANING.**
+        - DO NOT HALLUCINATE OR INFER KEYWORDS NOT PRESENT IN THE TEXT.
+        - **AVOID EXTRACTING SOFT SKILLS UNLESS EXPLICITLY NAMED (e.g., "Communication Skills," "Leadership"). Do not infer from descriptions like "managed a team."**
 
-    ANALYZE THIS JOB DESCRIPTION:
+    ANALYZE THIS RESUME:
     ---
     {text_input}
     ---
@@ -518,131 +502,110 @@ def extract_keywords():
     # This is the prompt we will send to the Gemini model
     prompt = f"""
     CRITICAL: You MUST return ONLY valid JSON. NO explanations, NO additional text, NO markdown formatting.
-    === TASK: RESEARCH-VALIDATED KEYWORD EXTRACTION ===
-    Extract ALL essential keywords from job descriptions using academic research-validated methodologies for optimal ATS and semantic matching. This system implements findings from NLP research papers and commercial platforms for production-level resume matching.
+    === TASK: STRICT KEYWORD EXTRACTION FOR DIRECT MATCHING ===
+    Extract ALL **explicitly mentioned** keywords from the job description for direct, exact string matching with resumes. This system prioritizes the literal presence of terms over semantic understanding or inference.
 
     === REQUIRED JSON OUTPUT FORMAT ===
-            {{
-            "required_keywords": {{
-                "hard_skills": [],
-                "tools_and_platforms": [],
-                "methodologies_and_frameworks": [],
-                "domain_knowledge": [],
-                "qualifications": [],
-                "experience_indicators": []
-            }},
-            "preferred_keywords": {{
-                "hard_skills": [],
-                "tools_and_platforms": [],
-                "methodologies_and_frameworks": [],
-                "domain_knowledge": [],
-                "qualifications": [],
-                "experience_indicators": []
-            }}
-            }}
+        {{
+        "required_keywords": {{
+            "hard_skills": [],
+            "tools_and_platforms": [],
+            "methodologies_and_frameworks": [],
+            "qualifications": [],
+            "experience_indicators": []
+        }},
+        "preferred_keywords": {{
+            "hard_skills": [],
+            "tools_and_platforms": [],
+            "methodologies_and_frameworks": [],
+            "qualifications": [],
+            "experience_indicators": []
+        }}
+        }}
 
-            === ESSENTIAL KEYWORD CATEGORIES (Research-Validated) ===
+        === ESSENTIAL KEYWORD CATEGORIES ===
 
-            1. **hard_skills**: Quantifiable, task-oriented technical competencies essential for role performance
-            - Programming languages, analytical methods, technical procedures
-            - Specialized techniques, laboratory methods, engineering processes
-            - Measurable competencies with clear learning pathways
-            - Examples: Python, Statistical Analysis, PCR, Finite Element Analysis, Machine Learning
+        1. **hard_skills**: Specific, technical, and quantifiable skills explicitly stated.
+        - Programming languages, analytical methods, technical procedures.
+        - Specialized techniques, engineering processes, specific scientific methods.
+        - Examples: Python, SQL, Data Analysis, C++, JavaScript, AWS Lambda.
 
-            2. **tools_and_platforms**: Specific software, hardware, and digital platforms
-            - Development environments, cloud services, collaboration tools
-            - Industry-specific software, machinery, laboratory equipment
-            - Examples: AWS, Git, Salesforce, Docker, Jira, Adobe Creative Suite
+        2. **tools_and_platforms**: Named software, hardware, systems, and digital environments.
+        - Development environments, cloud services, operating systems, databases, specific applications.
+        - Examples: Microsoft Azure, Git, Docker, Kubernetes, Jira, Tableau, Salesforce, SAP.
 
-            3. **methodologies_and_frameworks**: Named operational and project management approaches
-            - Process improvement systems, development practices, quality standards
-            - Compliance frameworks, industry methodologies
-            - Examples: Agile, Scrum, Lean Six Sigma, DevOps, ISO 27001, GDPR
+        3. **methodologies_and_frameworks**: Named operational approaches, project management methods, and compliance standards.
+        - Process improvement systems, development practices, quality standards, regulatory frameworks.
+        - Examples: Agile, Scrum, Kanban, ITIL, GAAP, GDPR, ISO 27001, Six Sigma.
 
-            4. **domain_knowledge**: Industry-specific expertise and specialized knowledge areas ONLY if explicitly mentioned
-            - Business sectors, functional areas, regulatory knowledge
-            - Theoretical concepts, business frameworks, scientific principles
-            - Examples: Healthcare, FinTech, GAAP, Quantum Mechanics, Supply Chain
-            - **CRITICAL: Only extract if explicitly stated in the job description. Do not infer or assume.**
+        4. **qualifications**: Formal educational credentials, certifications, and licenses, as specific titles.
+        - Academic degrees, professional certifications, regulatory licenses.
+        - Examples: Bachelor's Degree in Computer Science, MBA, PMP, CFA, AWS Certified Solutions Architect, RN License.
 
-            5. **qualifications**: Formal educational credentials, certifications, and licenses
-            - Academic degrees, professional certifications, regulatory licenses
-            - Must be specific titles, not general categories
-            - Examples: Bachelor of Science, PMP, CPA, AWS Solutions Architect, Registered Nurse
+        5. **experience_indicators**: Quantified experience requirements and seniority markers, including numbers and context.
+        - Years of experience
+        - Examples: "5+ years of experience," "3-5 years,"
 
-            6. **experience_indicators**: Quantified experience requirements and seniority markers
-            - Years of experience, proficiency levels, leadership scope
-            - Extract both numbers and context
+        === CONTEXTUAL IMPORTANCE CLASSIFICATION ===
 
-            === CONTEXTUAL IMPORTANCE CLASSIFICATION ===
+        **STRUCTURAL ANALYSIS APPROACH:**
+        1. First identify if the job description has explicit sections dividing requirements (e.g., "Requirements vs Preferences," "Must Have vs Nice to Have," "Required vs Preferred").
+        2. If explicit sections exist, classify keywords based on their section placement.
+        3. If no explicit sections exist, analyze each sentence for contextual classification.
 
-            **STRUCTURAL ANALYSIS APPROACH:**
-            1. First identify if the job description has explicit sections dividing requirements (e.g., "Requirements vs Preferences," "Must Have vs Nice to Have," "Required vs Preferred").
-            2. If explicit sections exist, classify keywords based on their section placement.
-            3. If no explicit sections exist, analyze each sentence for contextual classification.
+        **REQUIRED CLASSIFICATION INDICATORS:**
+        - Proximity to requirement words: "required", "must have", "essential", "mandatory", "need", "shall", "proven experience in".
+        - Listed under "Requirements," "Must have," or "Core Competencies" sections.
+        - Described as primary responsibilities or critical for the role.
+        - **Exclude organizational units, department names, and proper nouns that serve purely as context or collaborators unless explicitly stated as candidate skills, tools, or domain expertise.**
 
-            **REQUIRED CLASSIFICATION INDICATORS:**
-            - Proximity to requirement words: "required", "must", "essential", "mandatory", "need", "shall"
-            - Listed under "Requirements" or "Must have" sections
-            - Described as core responsibilities or primary duties
-            - **Ignore or exclude organizational units, department names, and proper nouns that serve purely as context or collaborators, unless explicitly mentioned as candidate skills or domain expertise.**
+        **PREFERRED CLASSIFICATION INDICATORS:**
+        - Near qualifier words: "preferred", "nice to have", "bonus", "plus", "advantage", "ideal", "familiarity with".
+        - Listed under "Nice to have," "Additional qualifications," or "Bonus points."
+        - Described as "would be great" or "a strong asset."
+        - Optional certifications or secondary skills.
 
-            **PREFERRED CLASSIFICATION INDICATORS:**
-            - Near qualifier words: "preferred", "nice to have", "bonus", "plus", "advantage", "ideal"
-            - Listed under "Nice to have" or "Additional qualifications"
-            - Described as "would be great" or "a plus"
-            - Optional certifications or secondary skills
+        **DEFAULT RULE:** When context is unclear, classify as REQUIRED (this ensures maximum coverage for initial matching).
 
-            **DEFAULT RULE:** When context is unclear, classify as REQUIRED (research shows this improves matching accuracy)
+        === STRICT EXTRACTION METHODOLOGY ===
+        1. **EXPLICIT MENTION ONLY**: Extract only terms directly present in the job description. Do not infer, generalize, or semantically expand.
+        2. **LITERAL ACCURACY**: Keywords must be extracted as they appear or as direct, commonly recognized atomic components of compound phrases.
+        3. **CATEGORY-SPECIFIC**: Ensure extracted terms fit precisely into the defined categories.
+        4. **NO INFERENCE**: Do not extract "implied" skills or knowledge unless the skill/knowledge itself is explicitly named.
 
-            === RESEARCH-BASED EXTRACTION METHODOLOGY ===
-            1. SEMANTIC SIGNIFICANCE: Prioritize contextual meaning over frequency - extract keywords based on professional relevance and semantic centrality within the text
-            2. HIERARCHICAL CLASSIFICATION: Use established skill taxonomies (ESCO, O*NET principles) to classify and validate keyword importance
-            3. CONTEXTUAL IMPORTANCE RANKING: Analyze proximity to requirement indicators, repetition patterns, and hierarchical positioning
-            4. DOMAIN-SPECIFIC RELEVANCE: Extract keywords that carry specialized meaning within professional contexts
-            5. COMPREHENSIVE COVERAGE: Capture both explicit mentions and implied competencies from job responsibilities
+        === ADVANCED EXTRACTION TECHNIQUES (ADJUSTED FOR STRICT MATCHING) ===
 
-            === ADVANCED EXTRACTION TECHNIQUES ===
+        **Compound Phrase Decomposition:**
+        - Break down compound terms into individual, searchable keywords.
+        - "Python and SQL development" → ["Python", "SQL"]
+        - "Machine Learning and AI systems" → ["Machine Learning", "AI"]
+        - "Bachelor's in Computer Science or Engineering" → ["Bachelor's in Computer Science", "Bachelor's in Engineering"]
+        - "Microsoft Office Suite" → ["Microsoft Office", "Word", "Excel", "PowerPoint"] (only if components are commonly searched/expected)
 
-            **Semantic Role Analysis:**
-            - Extract implied skills from job responsibilities ("manage team" → Leadership, Team Management)
-            - Capture domain expertise from industry context ONLY if explicitly mentioned
-            - **When extracting from action phrases involving interactions with entities or teams, prioritize extracting the implied behavioral or soft skill instead of the named entity or organizational unit.**
-            - **Filter out named entities, department names, or organization titles unless they directly represent candidate-required domain expertise or qualifications.**
-            - **Limit extraction of implied tools and platforms to only those explicitly mentioned or clearly indicated in context. Do not infer specific software or platforms solely from generic terms unless directly named.**
+        **Contextual Simplification (formerly 'Expansion'):**
+        - Include common abbreviations if the full term is also present, or vice-versa, only if both are used or one is a very common, direct substitute.
+        - **Strictly limit to direct abbreviations/full terms used within the text or universally understood aliases (e.g., "ML" for "Machine Learning" if ML is used or very common in context).**
+        - **DO NOT add speculative or commonly associated tools/platforms not explicitly appearing or strongly implied by the text.**
 
-            **Compound Phrase Decomposition:**
-            - "Python and SQL development" → ["Python", "SQL"]  
-            - "Machine learning and AI systems" → ["Machine Learning", "AI", "Artificial Intelligence"]
-            - "Bachelor's in Computer Science or Engineering" → ["Bachelor's in Computer Science", "Bachelor's in Engineering"]
+        **Atomic Term Prioritization:**
+        - If a phrase like "experience with relational databases like MySQL and PostgreSQL" appears, extract "MySQL" and "PostgreSQL." "Relational Databases" can also be extracted if it's a specific requirement.
 
-            **Contextual Expansion:**
-            - Include both full terms and common abbreviations
-            - Extract synonyms mentioned in context
-            - Capture implied competencies from complex phrases
-            - **Restrict expansion to avoid adding speculative or commonly associated tools/platforms not appearing explicitly or strongly implied by the text.**
+        === SUCCESS CRITERIA ===
+        - **EXACTNESS**: Keywords must be direct matches to terms or atomic components found in the job description.
+        - **COMPREHENSIVE COVERAGE**: Extract every explicit skill, tool, qualification, and competency mentioned.
+        - **CONTEXTUAL ACCURACY**: Proper classification based on linguistic cues and section placement.
+        - **ATOMIC GRANULARITY**: Break compound phrases into individual, searchable terms suitable for direct string matching.
+        - **NO SEMANTIC INFERENCE**: Avoid any keyword not directly supported by the literal text.
 
-            **Industry-Specific Extraction:**
-            - Prioritize domain-relevant terminology
-            - Extract compliance and regulatory terms specific to sector ONLY if explicitly mentioned
-            - Identify industry-standard tools and methodologies ONLY if explicitly mentioned
-
-            === RESEARCH-VALIDATED SUCCESS CRITERIA ===
-            - SEMANTIC PRECISION: Keywords must carry professional significance, not just statistical frequency
-            - COMPREHENSIVE COVERAGE: Extract every skill, tool, qualification, and competency mentioned or implied
-            - CONTEXTUAL ACCURACY: Proper classification based on linguistic cues and placement
-            - ATOMIC GRANULARITY: Break compound phrases into individual, searchable terms
-            - DOMAIN RELEVANCE: Prioritize industry-specific and role-relevant terminology
-            - PRODUCTION QUALITY: Suitable for commercial ATS and semantic matching systems
-
-            === CRITICAL REMINDERS ===
-            - RETURN ONLY THE JSON OBJECT
-            - NO EXPLANATIONS, COMMENTARY, OR METADATA
-            - EXTRACT BOTH EXPLICIT AND IMPLIED COMPETENCIES
-            - USE EXACT TERMINOLOGY FROM JOB DESCRIPTION WHEN POSSIBLE
-            - ENSURE ALL ARRAYS CONTAIN INDIVIDUAL ATOMIC KEYWORDS
-            - PRIORITIZE SEMANTIC MEANING OVER WORD FREQUENCY
-            - DO NOT HALLUCINATE OR INFER KEYWORDS NOT PRESENT IN THE TEXT
+        === CRITICAL REMINDERS ===
+        - RETURN ONLY THE JSON OBJECT.
+        - NO EXPLANATIONS, COMMENTARY, OR METADATA.
+        - **EXTRACT ONLY EXPLICITLY STATED COMPETENCIES.**
+        - USE EXACT TERMINOLOGY FROM JOB DESCRIPTION.
+        - ENSURE ALL ARRAYS CONTAIN INDIVIDUAL ATOMIC KEYWORDS.
+        - **PRIORITIZE LITERAL PRESENCE OVER SEMANTIC MEANING.**
+        - DO NOT HALLUCINATE OR INFER KEYWORDS NOT PRESENT IN THE TEXT.
+        - **AVOID EXTRACTING SOFT SKILLS UNLESS EXPLICITLY NAMED (e.g., "Communication Skills," "Leadership"). Do not infer from duties like "manage a team."**
 
     ANALYZE THIS JOB DESCRIPTION:
     ---
