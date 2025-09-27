@@ -525,17 +525,18 @@ def extract_keywords():
 
         === ESSENTIAL KEYWORD CATEGORIES ===
 
-        1. **hard_skills**: Specific, technical, and quantifiable skills explicitly stated.
+        1. **hard_skills**: Specific, technical, and quantifiable skills or areas of expertise **explicitly named**.
         - Programming languages, analytical methods, technical procedures.
-        - Specialized techniques, engineering processes, specific scientific methods.
-        - Examples: Python, SQL, Data Analysis, C++, JavaScript, AWS Lambda.
+        - Specialized techniques, engineering processes, specific scientific methods, fields of study.
+        - **CRITICAL: ONLY extract skills/expertise. DO NOT extract actions or descriptive qualities. Extract compound skill phrases as they appear.**
 
-        2. **tools_and_platforms**: Named software, hardware, systems, and digital environments.
-        - Development environments, cloud services, operating systems, databases, specific applications.
-        - Examples: Microsoft Azure, Git, Docker, Kubernetes, Jira, Tableau, Salesforce, SAP.
+        2. **tools_and_platforms**: Named software, hardware, systems, and digital environments **explicitly mentioned**.
+        - Development environments, cloud services, operating systems, databases, specific applications, libraries, frameworks (e.g., TensorFlow, PyTorch).
+        - Examples: Microsoft Azure, Git, Docker, Kubernetes, Jira, Tableau, Salesforce, SAP, ResNet, GANs, YOLO.
 
-        3. **methodologies_and_frameworks**: Named operational approaches, project management methods, and compliance standards.
-        - Process improvement systems, development practices, quality standards, regulatory frameworks.
+        3. **methodologies_and_frameworks**: Named operational approaches, project management methods, and compliance standards **explicitly mentioned**.
+        - Process improvement systems (e.g., Six Sigma), development practices (e.g., Agile, Scrum, Kanban), quality standards, regulatory frameworks (e.g., GDPR, ISO 27001), named architectural patterns (e.g., Microservices).
+        - **CRITICAL: Must be a named, formal methodology/framework. DO NOT include broader fields of study (e.g., ML, AI) or general approaches unless they are a defined, formal framework (e.g., Lean Six Sigma).**
         - Examples: Agile, Scrum, Kanban, ITIL, GAAP, GDPR, ISO 27001, Six Sigma.
 
         4. **qualifications**: Formal educational credentials, certifications, and licenses, as specific titles.
@@ -570,7 +571,7 @@ def extract_keywords():
         === STRICT EXTRACTION METHODOLOGY ===
         1. **EXPLICIT MENTION ONLY**: Extract only terms directly present in the job description. Do not infer, generalize, or semantically expand.
         2. **LITERAL ACCURACY**: Keywords must be extracted as they appear or as direct, commonly recognized atomic components of compound phrases.
-        3. **CATEGORY-SPECIFIC**: Ensure extracted terms fit precisely into the defined categories.
+        3. **CATEGORY-SPECIFIC**: Ensure extracted terms fit precisely into the defined categories based on their strict definitions.
         4. **NO INFERENCE**: Do not extract "implied" skills or knowledge unless the skill/knowledge itself is explicitly named.
 
         === ADVANCED EXTRACTION TECHNIQUES (ADJUSTED FOR STRICT MATCHING) ===
@@ -600,12 +601,11 @@ def extract_keywords():
         === CRITICAL REMINDERS ===
         - RETURN ONLY THE JSON OBJECT.
         - NO EXPLANATIONS, COMMENTARY, OR METADATA.
-        - **EXTRACT ONLY EXPLICITLY STATED COMPETENCIES.**
+        - **EXTRACT ONLY EXPLICITLY STATED COMPETENCIES. DO NOT INFER**
         - USE EXACT TERMINOLOGY FROM JOB DESCRIPTION.
         - ENSURE ALL ARRAYS CONTAIN INDIVIDUAL ATOMIC KEYWORDS.
-        - **PRIORITIZE LITERAL PRESENCE OVER SEMANTIC MEANING.**
+        - **PRIORITIZE LITERAL PRESENCE OVER SEMANTIC MEANING. DO NOT EXTRACT ACTIONS OR DESCRIPTIVE QUALITIES AS SKILLS.**
         - DO NOT HALLUCINATE OR INFER KEYWORDS NOT PRESENT IN THE TEXT.
-        - **AVOID EXTRACTING SOFT SKILLS UNLESS EXPLICITLY NAMED (e.g., "Communication Skills," "Leadership"). Do not infer from duties like "manage a team."**
 
     ANALYZE THIS JOB DESCRIPTION:
     ---
