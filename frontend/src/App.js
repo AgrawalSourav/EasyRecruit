@@ -239,7 +239,7 @@ const MainApp = () => {
   const [userResumes, setUserResumes] = useState([]);
   const [selectedResumeIds, setSelectedResumeIds] = useState([]);
   const [showExtractedKeywords, setShowExtractedKeywords] = useState(false);
-
+  const [isReporting, setIsReporting] = useState(false);
 
   const showAlert = (message, type = 'info', duration = 6000) => {
       setAlert({ show: true, message, type });
