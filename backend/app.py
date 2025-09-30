@@ -22,6 +22,9 @@ from resume_parser import UniversalResumeParser
 from pdf_extractor import DocumentExtractor
 import google.generativeai as genai
 
+# --- NEW: Import Flask-Mail ---
+from flask_mail import Mail, Message
+
 # --- Gemini API Configuration ---
 # DEPLOYMENT FIX: This is the critical change. We are explicitly setting the API endpoint.
 GEMINI_API_KEY = os.environ.get("GOOGLE_API_KEY")
@@ -76,12 +79,24 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL", "sqlite:///res
 # DEPLOYMENT: Disable a SQLAlchemy feature that adds overhead, which is not needed here.
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# --- NEW: Configure Flask-Mail from environment variables ---
+app.config = os.getenv('MAIL_SERVER')
+app.config = int(os.getenv('MAIL_PORT', 587))
+app.config = os.getenv('MAIL_USE_SSL', 'False').lower() in ['true', '1', 't']
+app.config = os.getenv('MAIL_USE_TLS', 'True').lower() in ['true', '1', 't']
+app.config = os.getenv('MAIL_USERNAME')
+app.config = os.getenv('MAIL_PASSWORD')
+# ---
+
 # --- NEW FEATURE: Setup Flask-Login ---
 login_manager = LoginManager()
 login_manager.init_app(app)
 # DEPLOYMENT: Initialize the SQLAlchemy object, which we will use for all database operations.
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
+
+# --- NEW: Initialize Mail instance ---
+mail = Mail(app)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -642,6 +657,55 @@ def extract_keywords():
         logger.error(f"Error calling Gemini API: {str(e)}")
         return jsonify({"error": "Failed to extract keywords from the Gemini API"}), 500
 
+# --- NEW: Add the feedback report endpoint ---
+@app.route('/report-inaccuracy', methods=['POST'])
+@login_required
+def report_inaccuracy():
+    try:
+        data = request.get_json()
+        if not all(k in data for k in ['job_description', 'resume_file_name', 'report_details']):
+            return jsonify({'error': 'Missing required fields for feedback report'}), 400
+
+        recipient_email = os.getenv('MAIL_RECIPIENT')
+        if not recipient_email:
+            logger.error("MAIL_RECIPIENT environment variable is not set. Cannot send feedback.")
+            # Return a success-like message to the user so their experience isn't broken
+            return jsonify({'message': 'Feedback received (logging only).'}), 200
+
+        subject = f"Inaccuracy Report for: {data['resume_file_name']}"
+
+        # Format the body of the email for readability
+        body = f"""
+A user has reported a potential inaccuracy in the matching report.
+
+--- USER ---
+Email: {current_user.email}
+
+--- CONTEXT ---
+Resume File: {data['resume_file_name']}
+
+==================== JOB DESCRIPTION ====================
+{data['job_description']}
+
+==================== GENERATED REPORT DETAILS ====================
+{json.dumps(data['report_details'], indent=2)}
+        """
+
+        msg = Message(
+            subject=subject,
+            sender=os.getenv('MAIL_USERNAME'),
+            recipients=[recipient_email],
+            body=body
+        )
+
+        mail.send(msg)
+
+        return jsonify({'message': 'Feedback submitted successfully'}), 201
+
+    except Exception as e:
+        logger.error(f"--- ERROR in /report-inaccuracy: {str(e)} ---")
+        logger.error(traceback.format_exc())
+        return jsonify({'error': 'An internal server error occurred while submitting feedback.'}), 500
 
 @app.route('/match', methods=['POST'])
 @login_required

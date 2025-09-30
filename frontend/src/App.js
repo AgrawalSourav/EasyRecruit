@@ -11,7 +11,7 @@ import {
 import { 
   FiUpload, FiFileText, FiSearch, FiAward, FiLogOut, 
   FiUser, FiTarget, FiTrendingUp, FiDownload, FiEye,
-  FiCheckCircle, FiClock, FiZap, FiEyeOff
+  FiCheckCircle, FiClock, FiZap, FiEyeOff, FiFlag
 } from 'react-icons/fi';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
@@ -350,6 +350,27 @@ const MainApp = () => {
     } catch (error) {
       console.error('Error downloading resume:', error);
       showAlert('Failed to download resume. You may need to log in again.', 'danger');
+    }
+  };
+
+  // --- NEW: Function to handle reporting inaccuracies ---
+  const handleReportInaccuracy = async () => {
+    if (!selectedCandidate) return;
+    setIsReporting(true);
+    try {
+        const payload = {
+            job_description: jdText,
+            resume_file_name: selectedCandidate.file_name,
+            report_details: selectedCandidate.report_details
+        };
+        await apiClient.post('/report-inaccuracy', payload);
+        showAlert('Thank you! Your feedback has been submitted successfully.', 'success');
+    } catch (error) {
+        console.error('Error submitting report:', error);
+        showAlert('Failed to submit feedback. Please try again.', 'danger');
+    } finally {
+        setIsReporting(false);
+        handleCloseReport(); // Close the modal after reporting
     }
   };
 
@@ -774,6 +795,10 @@ const MainApp = () => {
           <Modal.Header closeButton className="bg-light">
             <Modal.Title className="fw-bold">
               Detailed Report: {selectedCandidate.name}
+              <p className="text-muted small mb-0 fw-normal mt-1">
+                <FiFileText size={12} className="me-1" />
+                {selectedCandidate.file_name}
+              </p>
             </Modal.Title>
           </Modal.Header>
           <Modal.Body>
@@ -809,6 +834,18 @@ const MainApp = () => {
             </div>
           </Modal.Body>
           <Modal.Footer className="bg-light">
+            <Button 
+              variant="outline-warning" 
+              onClick={handleReportInaccuracy}
+              disabled={isReporting}
+              className="me-auto d-flex align-items-center"
+            >
+              {isReporting? (
+                <><Spinner size="sm" className="me-2" />Submitting...</>
+              ) : (
+                <><FiFlag className="me-1" />Report Inaccuracies</>
+              )}
+            </Button>
             <Button variant="secondary" onClick={handleCloseReport}>
               Close Report
             </Button>
